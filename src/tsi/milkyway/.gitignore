@@ -1,0 +1,16 @@
+# file types
+*.h5
+*.pdf
+
+# directories
+data/
+processed_data/
+figures/
+assets/
+
+# log directories
+sbi-logs/
+catboost_info/
+
+# system files
+*.DS_Store

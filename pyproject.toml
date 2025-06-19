@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "vsi"
+version = "0.0.1"
+description = "Valid Scientific Inference"
+readme = "README.md"  # This now includes the readme directly
+requires-python = ">=3.11"
+keywords = [
+    "valid scientific inference",
+    "likelihood-free",
+    "generative models",
+    "science",
+    "parameter estimation",
+    "confidence sets"
+]
+# license = {text = ""}
+authors = [
+    # {name = "", email = ""}
+]
+dependencies = []
+
+# [project.urls]
+# homepage = ""
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[project.optional-dependencies]
+test_estimators = [
+    "bayesflow",
+    "sbibm",
+    "sbi>=0.23.2"
+]
+test_autogluon = [
+    "sbibm",
+    "sbi>=0.23.2",
+    "autogluon",
+]
+example0 = [
+    "torchrl",
+]
+all = [
+    "bayesflow",
+    "sbibm",
+    "sbi>=0.23.2",
+    "autogluon",
+    "torchrl",
+]
+
+[project.entry-points]
+# TODO: command-line interface

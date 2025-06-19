@@ -1,0 +1,15 @@
+[submodule "lf2i"]
+	path = lf2i
+	url = git@github.com:lee-group-cmu/lf2i.git
+	branch = dev
+[submodule "src/vsi/brutus/brutus"]
+	path = src/vsi/brutus/brutus
+	url = git@github.com:JamesCarzon/brutus.git
+[submodule "src/vsi/toy_example/dingo"]
+	path = src/vsi/toy_example/dingo
+	url = git@github.com:dingo-gw/dingo.git
+	branch = main
+[submodule "sbi"]
+	path = sbi
+	url = git@github.com:sbi-dev/sbi.git
+	branch = main
