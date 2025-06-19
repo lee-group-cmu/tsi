@@ -3,13 +3,13 @@ requires = ["setuptools>=42", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "vsi"
+name = "tsi"
 version = "0.0.1"
-description = "Valid Scientific Inference"
+description = "Trustworthy Scientific Inference"
 readme = "README.md"  # This now includes the readme directly
 requires-python = ">=3.11"
 keywords = [
-    "valid scientific inference",
+    "trustworthy scientific inference",
     "likelihood-free",
     "generative models",
     "science",

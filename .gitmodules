@@ -2,11 +2,11 @@
 	path = lf2i
 	url = git@github.com:lee-group-cmu/lf2i.git
 	branch = dev
-[submodule "src/vsi/brutus/brutus"]
-	path = src/vsi/brutus/brutus
+[submodule "src/tsi/brutus/brutus"]
+	path = src/tsi/brutus/brutus
 	url = git@github.com:JamesCarzon/brutus.git
-[submodule "src/vsi/toy_example/dingo"]
-	path = src/vsi/toy_example/dingo
+[submodule "src/tsi/toy_example/dingo"]
+	path = src/tsi/toy_example/dingo
 	url = git@github.com:dingo-gw/dingo.git
 	branch = main
 [submodule "sbi"]

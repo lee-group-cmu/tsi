@@ -1,5 +1,5 @@
-# vsi
-Valid Scientific Inference
+# tsi
+Trustworthy Scientific Inference
 
 
 ## Install
@@ -7,7 +7,7 @@ Valid Scientific Inference
 Clone via
 
 ```commandline
-git clone --recurse-submodules git@github.com:lee-group-cmu/vsi.git
+git clone --recurse-submodules git@github.com:lee-group-cmu/tsi.git
 ```
 
 and install the `lf2i` submodule by navigating to the corresponding folder and by typing
@@ -16,7 +16,7 @@ and install the `lf2i` submodule by navigating to the corresponding folder and b
 pip install .
 ```
 
-Note that the above might require you to install R first. Then install `vsi` from the main folder specifying the desired `OPTIONS` via (add `-e` for editable mode)
+Note that the above might require you to install R first. Then install `tsi` from the main folder specifying the desired `OPTIONS` via (add `-e` for editable mode)
 
 ```commandline
 pip install ".[OPTION1,OPTION2]"
