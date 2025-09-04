@@ -19,6 +19,8 @@ from gaiaxpy.core.config import load_xpmerge_from_xml, load_xpsampling_from_xml
 
 from fmpes import CustomFMPE
 
+# NOTE: VSI = Valid Scientific Inference (now TSI = Trustworthy Scientific Inference)
+
 def setup_paths(notebook: bool = False) -> Dict[str, str]:
     """
     Create dictionary of file paths for data, output, and figures.
