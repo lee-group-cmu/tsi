@@ -36,6 +36,8 @@ assets/
 bash/
 results/
 dingo_results/
+err/
+out/
 *.key
 *.pdf
 *.pkl
