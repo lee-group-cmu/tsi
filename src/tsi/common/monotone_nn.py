@@ -128,7 +128,7 @@ class ParallelNeuralIntegral(torch.autograd.Function):
 
 
 class MonotonicNN(nn.Module):
-    def __init__(self, in_d, hidden_layers, nb_steps=50, sigmoid=True, input_bounds=None):
+    def __init__(self, in_d, hidden_layers, nb_steps=50, dropout_rate=0.0, sigmoid=True, input_bounds=None):
         """
         Args:
             in_d: Input dimension
@@ -141,20 +141,31 @@ class MonotonicNN(nn.Module):
         """
         super(MonotonicNN, self).__init__()
         self.integrand = IntegrandNN(in_d, hidden_layers)
+
         self.net = []
         hs = [in_d - 1] + hidden_layers + [2]
-        for h0, h1 in zip(hs, hs[1:]):
-            self.net.extend(
-                [
-                    nn.Linear(h0, h1),
-                    nn.ReLU(),
-                ]
-            )
+        for idx, (h0, h1) in enumerate(zip(hs, hs[1:])):
+            if idx < len(hs) - 2 and dropout_rate > 0: # Not output layer
+                self.net.extend(
+                    [
+                        nn.Linear(h0, h1, device=None, dtype=None),
+                        nn.Dropout(dropout_rate),
+                        nn.ReLU(),
+                    ]
+                )
+            else:
+                self.net.extend(
+                    [
+                        nn.Linear(h0, h1, device=None, dtype=None),
+                        nn.ReLU(),
+                    ]
+                )
         self.net.pop()  # pop the last ReLU for the output layer
         # It will output the scaling and offset factors.
         self.net = nn.Sequential(*self.net)
         self.nb_steps = nb_steps
         self.sigmoid = sigmoid
+        self.dropout_rate = dropout_rate
         
         # Store the bounds-based scaler as buffers
         if input_bounds is not None:
@@ -184,7 +195,7 @@ class MonotonicNN(nn.Module):
             return normalized * 3.0
         return x_input
 
-    def forward(self, x_input):
+    def forward_batch(self, x_input):
         x_input = x_input.float()
         
         # Apply bounds-based scaling if bounds are provided
@@ -213,6 +224,66 @@ class MonotonicNN(nn.Module):
                 + offset
             )
 
+    def forward(self, x_input, batch_size=4096, show_progress=True):
+        """
+        Memory-safe batched forward pass for large inputs.
+        
+        Args:
+            x_input: Input tensor or numpy array of shape [N, input_dim]
+            batch_size: Number of samples to process at once
+            show_progress: Whether to show progress bar
+            
+        Returns:
+            Output tensor of shape [N, 1] (or [N] if not sigmoid)
+        """
+        # Convert to tensor if needed
+        if isinstance(x_input, np.ndarray):
+            x_input = torch.from_numpy(x_input)
+        
+        x_input = x_input.float()
+        device = next(self.parameters()).device
+        
+        # If input is small enough, use regular forward
+        if x_input.shape[0] <= batch_size:
+            return self.forward_batch(x_input.to(device))
+        
+        # Process in batches
+        n_samples = x_input.shape[0]
+        outputs = []
+        
+        # Setup progress bar if requested
+        if show_progress:
+            try:
+                from tqdm import tqdm
+                pbar = tqdm(total=n_samples, desc="Forward pass")
+            except ImportError:
+                show_progress = False
+        
+        with torch.no_grad():
+            for i in range(0, n_samples, batch_size):
+                # Get batch
+                batch = x_input[i:i+batch_size].to(device)
+                
+                # Regular forward pass on batch
+                batch_output = self.forward_batch(batch)
+                
+                # Move to CPU immediately to free GPU memory
+                outputs.append(batch_output.cpu())
+                
+                # Update progress
+                if show_progress:
+                    pbar.update(batch.shape[0])
+                
+                # Clear GPU cache periodically
+                if torch.cuda.is_available() and i % (batch_size * 10) == 0:
+                    torch.cuda.empty_cache()
+        
+        if show_progress:
+            pbar.close()
+        
+        # Concatenate all batch outputs
+        return torch.cat(outputs, dim=0)
+
     def fit(self, X, y, config=None, logger=None):
         return 
 
@@ -222,6 +293,86 @@ class MonotonicNN(nn.Module):
     def predict_proba(self, X):
         proba = self.forward(X)
         return torch.hstack([1-proba, proba])
+
+
+class CompositeLoss(nn.Module):
+    def __init__(self, lambda_gp=0.0, lambda_bce=1.0):
+        """
+        Composite loss combining BCE and gradient penalty.
+        
+        Args:
+            lambda_gp: Weight for gradient penalty term
+            lambda_bce: Weight for BCE term (usually 1.0)
+        """
+        super().__init__()
+        self.bce = nn.BCELoss(reduction="sum")
+        self.lambda_gp = lambda_gp
+        self.lambda_bce = lambda_bce
+    
+    def gradient_penalty(self, model, x_input, predictions):
+        """
+        Compute gradient penalty w.r.t. test statistic (first input dimension).
+        
+        Args:
+            model: The MonotonicNN model
+            x_input: Input tensor with requires_grad=True
+            predictions: Already computed predictions (to avoid recomputation)
+        
+        Returns:
+            Gradient penalty scalar
+        """
+        if self.lambda_gp == 0.0:
+            return torch.tensor(0.0, device=x_input.device)
+        
+        # Compute gradients w.r.t. input
+        gradients = torch.autograd.grad(
+            outputs=predictions,
+            inputs=x_input,
+            grad_outputs=torch.ones_like(predictions),
+            create_graph=True,
+            retain_graph=True,
+            only_inputs=True,
+        )[0]
+        
+        # Only penalize gradient w.r.t. first dimension (test statistic)
+        grad_test_stat = gradients[:, 0]
+        
+        # Penalize deviation from unit gradient (smoother extrapolation)
+        # Alternative: just penalize large gradients with grad_test_stat.pow(2).mean()
+        gp = ((grad_test_stat.abs() - 1).clamp(min=0) ** 2).mean()
+        
+        return gp
+    
+    def forward(self, model, x_input, predictions, targets):
+        """
+        Compute composite loss.
+        
+        Args:
+            model: The MonotonicNN model (needed for gradient penalty)
+            x_input: Input tensor (should have requires_grad=True for GP)
+            predictions: Model predictions
+            targets: Ground truth labels
+        
+        Returns:
+            total_loss, loss_dict with individual components
+        """
+        # BCE loss
+        bce_loss = self.bce(predictions, targets)
+        
+        # Gradient penalty
+        gp_loss = self.gradient_penalty(model, x_input, predictions)
+        
+        # Total loss
+        total_loss = self.lambda_bce * bce_loss + self.lambda_gp * gp_loss
+        
+        # Return loss components for logging
+        loss_dict = {
+            'total': total_loss.item(),
+            'bce': bce_loss.item(),
+            'gp': gp_loss.item() if self.lambda_gp > 0 else 0.0
+        }
+        
+        return total_loss, loss_dict
 
 
 # Outputs object of type MonotonicNN
@@ -266,7 +417,13 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
     
     # === MODEL SETUP ===
     # Note: Model should output nonnegative values (sigmoid ensures [0,1])
-    model = MonotonicNN(in_d=augmented_inputs.shape[-1], hidden_layers=config['hidden_layers'] or [256, 256, 256], sigmoid=True, input_bounds=input_bounds)
+    model = MonotonicNN(
+        in_d=augmented_inputs.shape[-1],
+        hidden_layers=config['hidden_layers'] or [256, 256, 256],
+        dropout_rate=config['dropout_rate'] or 0.0,
+        sigmoid=True,
+        input_bounds=input_bounds
+    )
     model.to(config["DEVICE"])
     
     # Count parameters
@@ -284,14 +441,18 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
         trainset, 
         batch_size=config["batch_size"], 
         shuffle=True, 
-        num_workers=config["num_workers"]
+        num_workers=0
     )
     
     # === LOSS FUNCTION FOR NONNEGATIVE OUTPUTS ===
     # Since model uses sigmoid (outputs in [0,1]), use BCE loss directly on probabilities
-    loss_fn = torch.nn.BCELoss(reduction="sum")
-    print("Using BCE loss with sum reduction for nonnegative outputs (no class weighting)")
-    
+    loss_fn = CompositeLoss(
+        lambda_gp=config.get("lambda_gp", 0.0),  # Default to 0 (no GP)
+        lambda_bce=1.0
+    )
+    print(f"Using composite loss: BCE (weight={loss_fn.lambda_bce}) + "
+          f"Gradient Penalty (weight={loss_fn.lambda_gp})")
+
     # === OPTIMIZER WITH GRADIENT CLIPPING ===
     optimizer = torch.optim.AdamW(
         model.parameters(), 
@@ -307,15 +468,23 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
     best_loss = float('inf')
     patience_counter = 0
     early_stop_patience = 50
-    
+
     # === TRAINING LOOP WITH DEBUGGING ===
     print(f"\n{'='*50}")
     print("STARTING TRAINING")
     print(f"{'='*50}")
+    print(f"Total parameters: {sum(p.numel() for p in model.parameters()):,}")
+    print(f"Training samples: {train_size:,}")
+    print(f"Batch size: {config['batch_size']}")
+    print(f"Gradient penalty: λ_GP={loss_fn.lambda_gp}")
+    print(f"Dropout rate: {model.dropout_rate if hasattr(model, 'dropout_rate') else 0.0}")
+    print(f"{'='*50}\n")
     
     for epoch in (pbar := tqdm(range(1, config["n_epochs"] + 1))):
         epoch_start_time = time.time()
         training_loss_batch = []
+        bce_losses = []
+        gp_losses = []
         model.train()
         
         # Gradient and output monitoring
@@ -325,25 +494,26 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
         for batch_idx, (feature, target) in enumerate(train_dataloader):
             feature = feature.to(config["DEVICE"])
             target = target.to(config["DEVICE"])
+            
+            # Enable gradient tracking for inputs if using gradient penalty
+            if loss_fn.lambda_gp > 0:
+                feature.requires_grad_(True)
+            
             optimizer.zero_grad()
             
-            # Forward pass (model outputs probabilities in [0,1] due to sigmoid)
+            # Forward pass
             probs = model(feature)
             
-            # # Verify outputs are nonnegative and in [0,1]
-            # assert torch.all(probs >= 0) and torch.all(probs <= 1), \
-            #     f"Batch {batch_idx}: model outputs outside [0,1] range!"
-
-            # Check for NaNs or Infs in outputs
-            num_nans = torch.isnan(probs).sum().item()
-            num_infs = torch.isinf(probs).sum().item()
-            total = probs.numel()
-            if num_nans > 0 or num_infs > 0:
-                print(f"Batch {batch_idx}: {num_nans}/{total} ({num_nans/total:.4%}) NaNs, "
-                      f"{num_infs}/{total} ({num_infs/total:.4%}) Infs in outputs!")
+            # Check for NaNs or Infs
+            if torch.isnan(probs).any() or torch.isinf(probs).any():
+                num_nans = torch.isnan(probs).sum().item()
+                num_infs = torch.isinf(probs).sum().item()
+                total = probs.numel()
+                print(f"\n⚠️  Epoch {epoch}, Batch {batch_idx}: "
+                    f"{num_nans}/{total} NaNs, {num_infs}/{total} Infs")
             
-            # Loss calculation using BCE on probabilities
-            loss = loss_fn(probs.squeeze(), target.squeeze())
+            # Loss calculation
+            loss, loss_dict = loss_fn(model, feature, probs.squeeze(), target.squeeze())
             
             # Backward pass
             loss.backward()
@@ -352,88 +522,110 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
             torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
             
             # Calculate gradient norm
-            batch_grad_norm = 0
-            for p in model.parameters():
-                if p.grad is not None:
-                    batch_grad_norm += p.grad.data.norm(2).item() ** 2
-            batch_grad_norm = batch_grad_norm ** 0.5
+            batch_grad_norm = sum(
+                p.grad.data.norm(2).item() ** 2 
+                for p in model.parameters() if p.grad is not None
+            ) ** 0.5
             total_grad_norm += batch_grad_norm
             
             optimizer.step()
-            training_loss_batch.append(loss.item())
+            
+            # Store losses
+            training_loss_batch.append(loss_dict['total'])
+            bce_losses.append(loss_dict['bce'])
+            gp_losses.append(loss_dict['gp'])
             
             # Monitor outputs
             output_stats.append({
-                'mean_prob': probs.mean().item(),
-                'std_prob': probs.std().item(),
-                'min_prob': probs.min().item(),
-                'max_prob': probs.max().item()
+                'mean': probs.mean().item(),
+                'std': probs.std().item(),
+                'min': probs.min().item(),
+                'max': probs.max().item()
             })
         
-        # Epoch statistics
+        # === EPOCH SUMMARY ===
         epoch_time = time.time() - epoch_start_time
         train_loss_epoch = np.mean(training_loss_batch)
+        avg_bce = np.mean(bce_losses)
+        avg_gp = np.mean(gp_losses)
         avg_grad_norm = total_grad_norm / len(train_dataloader)
         current_lr = optimizer.param_groups[0]['lr']
         
         # Output statistics
-        avg_output_stats = {
-            'mean_prob': np.mean([s['mean_prob'] for s in output_stats]),
-            'std_prob': np.mean([s['std_prob'] for s in output_stats]),
-            'min_prob': np.min([s['min_prob'] for s in output_stats]),
-            'max_prob': np.max([s['max_prob'] for s in output_stats])
-        }
+        avg_prob_mean = np.mean([s['mean'] for s in output_stats])
+        avg_prob_std = np.mean([s['std'] for s in output_stats])
+        prob_min = np.min([s['min'] for s in output_stats])
+        prob_max = np.max([s['max'] for s in output_stats])
+        
+        # Update progress bar with key metrics
+        pbar.set_postfix({
+            'Loss': f'{train_loss_epoch:.4f}',
+            'BCE': f'{avg_bce:.4f}',
+            'GP': f'{avg_gp:.4e}',
+            'LR': f'{current_lr:.2e}',
+            'GradNorm': f'{avg_grad_norm:.3f}'
+        })
+        
+        # Detailed logging every N epochs or at end
+        if epoch % 10 == 0 or epoch == config["n_epochs"]:
+            print(f"\n{'─'*70}")
+            print(f"EPOCH {epoch}/{config['n_epochs']} SUMMARY ({epoch_time:.1f}s)")
+            print(f"{'─'*70}")
+            print(f"Loss:      Total={train_loss_epoch:.6f}  BCE={avg_bce:.6f}  GP={avg_gp:.6e}")
+            print(f"Outputs:   μ={avg_prob_mean:.4f}  σ={avg_prob_std:.4f}  "
+                f"range=[{prob_min:.4f}, {prob_max:.4f}]")
+            print(f"Training:  LR={current_lr:.2e}  GradNorm={avg_grad_norm:.4f}")
+            print(f"Progress:  Best={best_loss:.6f}  Patience={patience_counter}/{early_stop_patience}")
+            print(f"{'─'*70}\n")
         
         # Learning rate scheduling
         scheduler.step(train_loss_epoch)
         
         # Early stopping
         if train_loss_epoch < best_loss:
+            improvement = best_loss - train_loss_epoch
             best_loss = train_loss_epoch
             patience_counter = 0
+            
             # Save best model
-            torch.save(model.state_dict(), f'{config.get("assets_dir", ".")}/best_monotonic_nn.pt')
+            save_path = f'{config.get("assets_dir", ".")}/best_monotonic_nn.pt'
+            torch.save({
+                'epoch': epoch,
+                'model_state_dict': model.state_dict(),
+                'optimizer_state_dict': optimizer.state_dict(),
+                'loss': best_loss,
+                'config': config
+            }, save_path)
+            
+            if epoch % 10 == 0:
+                print(f"✓ New best model saved (improved by {improvement:.6f})")
         else:
             patience_counter += 1
+            if patience_counter >= early_stop_patience:
+                print(f"\n{'='*70}")
+                print(f"EARLY STOPPING at epoch {epoch}")
+                print(f"Best loss: {best_loss:.6f} (epoch {epoch - patience_counter})")
+                print(f"{'='*70}\n")
+                break
         
         # Log epoch data
         if logger:
             logger.log_epoch(
                 epoch=epoch,
-                epoch_loss=train_loss_epoch,
-                batch_losses=training_loss_batch.copy(),
-                epoch_time=epoch_time,
-                lr=current_lr
+                metrics={
+                    'train_loss': train_loss_epoch,
+                    'bce_loss': avg_bce,
+                    'gp_loss': avg_gp,
+                    'grad_norm': avg_grad_norm,
+                    'lr': current_lr,
+                    'prob_mean': avg_prob_mean,
+                    'prob_std': avg_prob_std,
+                    'prob_min': prob_min,
+                    'prob_max': prob_max,
+                    'epoch_time': epoch_time,
+                    'patience': patience_counter
+                }
             )
-        
-        # Detailed progress info
-        epoch_len = len(str(config["n_epochs"]))
-        msg = (f"[{epoch:>{epoch_len}}/{config['n_epochs']:>{epoch_len}}] | "
-               f"loss: {train_loss_epoch:.5f} | "
-               f"prob: {avg_output_stats['mean_prob']:.3f}±{avg_output_stats['std_prob']:.3f} | "
-               f"range: [{avg_output_stats['min_prob']:.3f}, {avg_output_stats['max_prob']:.3f}] | "
-               f"grad: {avg_grad_norm:.2e} | "
-               f"lr: {current_lr:.2e}")
-        pbar.set_description(msg)
-        
-        # Print detailed stats every 10 epochs or if outputs are problematic
-        if epoch % 10 == 0 or avg_output_stats['max_prob'] < 0.01 or avg_output_stats['min_prob'] > 0.99:
-            print(f"\nEpoch {epoch} detailed stats:")
-            print(f"  Loss: {train_loss_epoch:.6f}")
-            print(f"  Output probabilities: {avg_output_stats['mean_prob']:.4f} ± {avg_output_stats['std_prob']:.4f}")
-            print(f"  Output range: [{avg_output_stats['min_prob']:.4f}, {avg_output_stats['max_prob']:.4f}]")
-            print(f"  Gradient norm: {avg_grad_norm:.2e}")
-            print(f"  Learning rate: {current_lr:.2e}")
-            
-            if avg_output_stats['max_prob'] < 0.01:
-                print("  ⚠️  WARNING: All outputs near zero!")
-            elif avg_output_stats['min_prob'] > 0.99:
-                print("  ⚠️  WARNING: All outputs near one!")
-        
-        # Early stopping check
-        if patience_counter >= early_stop_patience:
-            print(f"\nEarly stopping at epoch {epoch} (no improvement for {early_stop_patience} epochs)")
-            break
     
     # Load best model
     model.load_state_dict(torch.load(f'{config.get("assets_dir", ".")}/best_monotonic_nn.pt', weights_only=True))
@@ -480,4 +672,4 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
         print(f"  Accuracy (threshold=0.5): {accuracy.item():.4f}")
 
     print("✓ Monotonic Neural Network training completed")
-    return model
+    return model, input_bounds
