@@ -19,11 +19,12 @@ from lf2i.calibration.critical_values import train_qr_algorithm
 from lf2i.utils.other_methods import hpd_region
 from lf2i.plot.parameter_regions import plot_parameter_regions
 from lf2i.plot.coverage_diagnostics import coverage_probability_plot
+from lf2i.plot.power_diagnostics import set_size_plot
 
 ### Settings
 POI_DIM = 2  # parameter of interest
 PRIOR_LOC = [0, 0]
-PRIOR_VAR = 0.5 # (6*np.sqrt(2.0))**2
+PRIOR_VAR = 0.1 # (6*np.sqrt(2.0))**2
 POI_BOUNDS = {r'$\theta_1$': (-1, 1), r'$\theta_2$': (-1, 1)}
 PRIOR = MultivariateNormal(
     loc=torch.Tensor([0.5, 0.5]), covariance_matrix=PRIOR_VAR*torch.eye(n=POI_DIM)
@@ -95,13 +96,11 @@ try:
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='critical-values',
+        calibration_method='p-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
-            # 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
-            # 'n_iter': 25
-            'cv': {'iterations': [100], 'depth': [3]},
-            'n_iter': 1
+            'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
+            'n_iter': 25
         },
         T_prime=(b_prime_params, b_prime_samples),
         retrain_calibration=False
@@ -112,13 +111,11 @@ except:
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='critical-values',
+        calibration_method='p-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
-            # 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
-            # 'n_iter': 25
-            'cv': {'iterations': [100], 'depth': [3]},
-            'n_iter': 1
+            'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
+            'n_iter': 25
         },
         T_prime=(b_prime_params, b_prime_samples),
         retrain_calibration=False
@@ -133,30 +130,26 @@ try:
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='critical-values',
+        calibration_method='p-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
-            # 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
-            # 'n_iter': 25
-            'cv': {'iterations': [100], 'depth': [3]},
-            'n_iter': 1
+            'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
+            'n_iter': 25
         },
         T_prime=(b_prime_params, b_prime_samples),
         retrain_calibration=False
     )
 except:
-    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=snpe_posterior, estimation_method='posterior', num_posterior_samples=5_000, **POSTERIOR_KWARGS))
+    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=snpe_posterior, estimation_method='posterior', num_posterior_samples=50_000, **POSTERIOR_KWARGS))
     confidence_setsw = lf2iw.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='critical-values',
+        calibration_method='p-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
-            # 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
-            # 'n_iter': 25
-            'cv': {'iterations': [100], 'depth': [3]},
-            'n_iter': 1
+            'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
+            'n_iter': 25
         },
         T_prime=(b_prime_params, b_prime_samples),
         retrain_calibration=False
@@ -323,7 +316,7 @@ except:
         diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2i.diagnostics(
             region_type='lf2i',
             confidence_level=cl,
-            calibration_method='critical-values',
+            calibration_method='p-values',
             coverage_estimator='splines',
             T_double_prime=(b_double_prime_params, b_double_prime_samples),
         )
@@ -344,7 +337,7 @@ except:
         diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2iw.diagnostics(
             region_type='lf2i',
             confidence_level=cl,
-            calibration_method='critical-values',
+            calibration_method='p-values',
             coverage_estimator='splines',
             T_double_prime=(b_double_prime_params, b_double_prime_samples),
         )
@@ -387,56 +380,81 @@ except:
 try:
     with open('results/confidence_sets_for_size.pkl', 'rb') as f:
         confidence_sets_for_size = dill.load(f)
+    with open('results/set_for_size.pkl', 'rb') as f:
+        set_for_size = dill.load(f)
+        params_for_size = set_for_size['params']
+        samples_for_size = set_for_size['samples']
 except:
+    params_for_size = EVAL_GRID_DISTR.sample(sample_shape=(B_DOUBLE_PRIME, ))
+    samples_for_size = simulator(params_for_size)
+    params_for_size.shape, samples_for_size.shape
+    with open('results/set_for_size.pkl', 'wb') as f:
+        dill.dump({
+            'params': params_for_size,
+            'samples': samples_for_size
+        }, f)
+
     size_grid_for_sizes = 5_000
     confidence_sets_for_size = lf2i.inference(
-        x=b_double_prime_samples,
+        x=samples_for_size,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='critical-values',
+        calibration_method='p-values',
     )
     confset_sizes = np.array([100*cs.shape[0]/size_grid_for_sizes for cs in confidence_sets_for_size[0]])
     with open('results/confidence_sets_for_size.pkl', 'wb') as f:
         dill.dump(confidence_sets_for_size, f)
 
-    plt.scatter(b_double_prime_params[:, 0], b_double_prime_params[:, 1], c=confset_sizes)
-    plt.clim(0, 100)
-    plt.colorbar()
-    plt.title('FreB sizes, 1-100\%')
-    plt.savefig('results/freb_sizes_fixed_scale.png')
-    plt.close()
+    set_size_plot(
+        parameters=params_for_size,
+        set_sizes=confset_sizes,
+        param_dim=2,
+        figsize=(10, 10),
+        vmin_vmax=(0, 50),
+        title='FreB sizes',
+        save_fig_path='results/freb_sizes_0_50.png'
+    )
 
-    plt.scatter(b_double_prime_params[:, 0], b_double_prime_params[:, 1], c=confset_sizes)
-    plt.colorbar()
-    plt.title('FreB sizes')
-    plt.savefig('results/freb_sizes.png')
-    plt.close()
+    set_size_plot(
+        parameters=params_for_size,
+        set_sizes=confset_sizes,
+        param_dim=2,
+        figsize=(10, 10),
+        vmin_vmax=(0, 100),
+        title='FreB sizes',
+        save_fig_path='results/freb_sizes.png'
+    )
 
 try:
     with open('results/confidence_sets_for_size_waldo.pkl', 'rb') as f:
         confidence_sets_for_size = dill.load(f)
 except:
-    size_grid_for_sizes = 5_000
     confidence_sets_for_size = lf2iw.inference(
-        x=b_double_prime_samples,
+        x=samples_for_size,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='critical-values',
+        calibration_method='p-values',
     )
-    size_grid_for_sizes = 5_000
     confset_sizes = np.array([100*cs.shape[0]/size_grid_for_sizes for cs in confidence_sets_for_size[0]])
     with open('results/confidence_sets_for_size_waldo.pkl', 'wb') as f:
         dill.dump(confidence_sets_for_size, f)
 
-    plt.scatter(b_double_prime_params[:, 0], b_double_prime_params[:, 1], c=confset_sizes)
-    plt.clim(0, 100)
-    plt.colorbar()
-    plt.title('Waldo sizes, 1-100\%')
-    plt.savefig('results/waldo_sizes_fixed_scale.png')
-    plt.close()
+    set_size_plot(
+        parameters=params_for_size,
+        set_sizes=confset_sizes,
+        param_dim=2,
+        figsize=(10, 10),
+        vmin_vmax=(0, 50),
+        title='Waldo sizes',
+        save_fig_path='results/waldo_sizes_0_50.png'
+    )
 
-    plt.scatter(b_double_prime_params[:, 0], b_double_prime_params[:, 1], c=confset_sizes)
-    plt.colorbar()
-    plt.title('Waldo sizes')
-    plt.savefig('results/waldo_sizes.png')
-    plt.close()
+    set_size_plot(
+        parameters=params_for_size,
+        set_sizes=confset_sizes,
+        param_dim=2,
+        figsize=(10, 10),
+        vmin_vmax=(0, 100),
+        title='Waldo sizes',
+        save_fig_path='results/waldo_sizes.png'
+    )
