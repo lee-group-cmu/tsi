@@ -75,7 +75,7 @@ class TrainingLogger:
         self.losses['epoch_losses'].append(epoch_loss)
         self.losses['bce_losses'].append(bce_loss)
         self.losses['gp_losses'].append(gp_loss)
-        self.losses['epoch_time'].append(epoch_time)
+        self.losses['epoch_times'].append(epoch_time)
         if lr is not None:
             self.losses['learning_rates'].append(lr)
     
