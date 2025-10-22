@@ -16,7 +16,7 @@ def create_experiment_hash(config, experiment_id=None):
         
         # Create a config hash for uniqueness (focusing on training-specific params)
         training_config = {k: v for k, v in config.items() 
-                          if k in ['hidden_dims', 'lr', 'batch_size', 'n_epochs', 'weight_decay']}
+                          if k in ['hidden_dims', 'lr', 'batch_size', 'n_epochs', 'weight_decay', 'lambda_gp', 'dropout_rate']}
         config_str = json.dumps(training_config, sort_keys=True)
         config_hash = hashlib.md5(config_str.encode()).hexdigest()[:8]
         
@@ -26,13 +26,17 @@ def create_experiment_hash(config, experiment_id=None):
             layers_str = "x".join(map(str, config['hidden_dims']))
             training_params.append(f"h{layers_str}")
         if 'lr' in config:
-            training_params.append(f"lr{config['learning_rate']}")
+            training_params.append(f"lr{config['lr']}")
         if 'batch_size' in config:
             training_params.append(f"bs{config['batch_size']}")
         if 'n_epochs' in config:
             training_params.append(f"ep{config['n_epochs']}")
         if 'weight_decay' in config:
             training_params.append(f"wd{config['weight_decay']}")
+        if 'lambda_gp' in config:
+            training_params.append(f"gp{config['lambda_gp']}")
+        if 'dropout_rate' in config:
+            training_params.append(f"dr{config['dropout_rate']}")
         
         training_str = "_".join(training_params) if training_params else "default"
         experiment_id = f"{timestamp}_{training_str}_{config_hash}"
