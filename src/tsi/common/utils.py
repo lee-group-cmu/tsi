@@ -62,18 +62,20 @@ class TrainingLogger:
         self.log_dir = log_dir
         self.losses = {
             'epoch_losses': [],
-            'batch_losses': [],
+            'bce_losses': [],
+            'gp_losses': [],
             'epoch_times': [],
             'learning_rates': [],
             'metadata': {}
         }
         os.makedirs(log_dir, exist_ok=True)
     
-    def log_epoch(self, epoch, epoch_loss, batch_losses, epoch_time, lr=None):
+    def log_epoch(self, epoch, epoch_loss, bce_loss, gp_loss, epoch_time, lr=None):
         """Log epoch-level metrics"""
         self.losses['epoch_losses'].append(epoch_loss)
-        self.losses['batch_losses'].append(batch_losses)
-        self.losses['epoch_times'].append(epoch_time)
+        self.losses['bce_losses'].append(bce_loss)
+        self.losses['gp_losses'].append(gp_loss)
+        self.losses['epoch_time'].append(epoch_time)
         if lr is not None:
             self.losses['learning_rates'].append(lr)
     
@@ -95,6 +97,8 @@ class TrainingLogger:
         df = pd.DataFrame({
             'epoch': range(1, len(self.losses['epoch_losses']) + 1),
             'loss': self.losses['epoch_losses'],
+            'bce_loss': self.losses['bce_losses'],
+            'gp_loss': self.losses['gp_losses'],
             'epoch_time': self.losses['epoch_times']
         })
         if self.losses['learning_rates']:
@@ -103,7 +107,7 @@ class TrainingLogger:
         df.to_csv(filepath, index=False)
         print(f"✓ Training losses saved to CSV: {filepath}")
     
-    def plot_training_curves(self, filename="training_curves.png", show_batch_losses=True):
+    def plot_training_curves(self, filename="training_curves.png", show_batch_losses=False):
         """Plot training curves"""
         fig, axes = plt.subplots(2, 2, figsize=(15, 10))
         fig.suptitle('Training Curves', fontsize=16)

@@ -612,19 +612,11 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
         if logger:
             logger.log_epoch(
                 epoch=epoch,
-                metrics={
-                    'train_loss': train_loss_epoch,
-                    'bce_loss': avg_bce,
-                    'gp_loss': avg_gp,
-                    'grad_norm': avg_grad_norm,
-                    'lr': current_lr,
-                    'prob_mean': avg_prob_mean,
-                    'prob_std': avg_prob_std,
-                    'prob_min': prob_min,
-                    'prob_max': prob_max,
-                    'epoch_time': epoch_time,
-                    'patience': patience_counter
-                }
+                epoch_loss=train_loss_epoch,
+                bce_loss=avg_bce,
+                gp_loss=avg_gp,
+                epoch_time=epoch_time,
+                lr=current_lr,
             )
     
     # Load best model
