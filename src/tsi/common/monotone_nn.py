@@ -587,15 +587,19 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
             best_loss = train_loss_epoch
             patience_counter = 0
             
-            # Save best model
-            save_path = f'{config.get("assets_dir", ".")}/best_monotonic_nn.pt'
+            assets_dir = config.get("assets_dir", ".")
+    
+            # Save full checkpoint (for debugging/resuming)
             torch.save({
                 'epoch': epoch,
                 'model_state_dict': model.state_dict(),
                 'optimizer_state_dict': optimizer.state_dict(),
                 'loss': best_loss,
                 'config': config
-            }, save_path)
+            }, f'{assets_dir}/best_monotonic_nn_full.pt')
+            
+            # Save weights only (for easy loading)
+            torch.save(model.state_dict(), f'{assets_dir}/best_monotonic_nn.pt')
             
             if epoch % 10 == 0:
                 print(f"✓ New best model saved (improved by {improvement:.6f})")
@@ -620,7 +624,11 @@ def train_monotonic_nn(T_prime, test_statistic, config, logger=None):
             )
     
     # Load best model
-    model.load_state_dict(torch.load(f'{config.get("assets_dir", ".")}/best_monotonic_nn.pt', weights_only=True))
+    model.load_state_dict(torch.load(
+        f'{config.get("assets_dir", ".")}/best_monotonic_nn.pt',
+        weights_only=True,
+        map_location=config['DEVICE']
+    ))
     
     # === FINAL MODEL EVALUATION ===
     print(f"\n{'='*50}")

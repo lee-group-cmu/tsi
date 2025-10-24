@@ -50,7 +50,7 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    experiment_dir = f"results/{EXPERIMENT_ID}"
+    experiment_dir = f"results/fmpe/{EXPERIMENT_ID}"
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -99,22 +99,21 @@ def main(hidden_layers,
     task = sbibm.get_task('gaussian_mixture')
     simulator = task.get_simulator()
     try:
-        with open(f'{experiment_dir}/snpe_strong_prior.pkl', 'rb') as f:
-            snpe_posterior = dill.load(f)
+        with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'rb') as f:
+            fmpe_posterior = dill.load(f)
     except:
         b_params = PRIOR.sample(sample_shape=(B, ))
         b_samples = simulator(b_params)
         b_params.shape, b_samples.shape
-        snpe = SNPE(
+        fmpe = FMPE(
             prior=PRIOR,
-            density_estimator='maf',
             device='cpu'
         )
 
-        _ = snpe.append_simulations(b_params, b_samples).train()
-        snpe_posterior = snpe.build_posterior()
-        with open(f'{experiment_dir}/snpe_strong_prior.pkl', 'wb') as f:
-            dill.dump(snpe_posterior, f)
+        _ = fmpe.append_simulations(b_params, b_samples).train()
+        fmpe_posterior = fmpe.build_posterior()
+        with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'wb') as f:
+            dill.dump(fmpe_posterior, f)
     b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
     b_prime_samples = simulator(b_prime_params)
     b_prime_params.shape, b_prime_samples.shape
@@ -132,7 +131,7 @@ def main(hidden_layers,
                 'obs_x': obs_x
             }, f)
 
-    lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=snpe_posterior,))
+    lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=fmpe_posterior,))
     logger = TrainingLogger(f'{experiment_dir}/logs')
     model, input_bounds = train_monotonic_nn(
         T_prime=(b_prime_params, b_prime_samples),
@@ -167,7 +166,7 @@ def main(hidden_layers,
             retrain_calibration=False
         )
     except:
-        lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=snpe_posterior, **POSTERIOR_KWARGS))
+        lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=fmpe_posterior, **POSTERIOR_KWARGS))
         confidence_sets = lf2i.inference(
             x=obs_x,
             evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
@@ -193,7 +192,7 @@ def main(hidden_layers,
         credible_sets_x = []
         for cl in CONFIDENCE_LEVEL:
             actual_cred_level, credible_set = hpd_region(
-                posterior=snpe_posterior,
+                posterior=fmpe_posterior,
                 param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
                 x=x.reshape(-1, ),
                 credible_level=cl,
