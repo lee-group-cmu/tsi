@@ -27,12 +27,12 @@ PRIOR_LOC = [0, 0]
 PRIOR_VAR = 0.1 # (6*np.sqrt(2.0))**2
 POI_BOUNDS = {r'$\theta_1$': (-1, 1), r'$\theta_2$': (-1, 1)}
 PRIOR = BoxUniform(
-    low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0], POI_BOUNDS[r'$\theta_2$'][0])),
-    high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1], POI_BOUNDS[r'$\theta_2$'][1]))
+    low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
+    high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
 )
 
-B = 150_000  # num simulations to estimate posterior and test statistics
-B_PRIME = 100_000  # num simulations to estimate critical values
+B = 100_000  # num simulations to estimate posterior and test statistics
+B_PRIME = 50_000  # num simulations to estimate critical values
 B_DOUBLE_PRIME = 30_000  # num simulations to do diagnostics
 EVAL_GRID_SIZE = 50_000  # num evaluation points over parameter space to construct confidence sets
 CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
@@ -55,22 +55,22 @@ simulator = task.get_simulator()
 
 ### NDE
 try:
-    with open('results/uniform_prior/snpe_uniform_prior.pkl', 'rb') as f:
-        snpe_posterior = dill.load(f)
+    with open('results/uniform_prior/fmpe_uniform_prior.pkl', 'rb') as f:
+        fmpe_posterior = dill.load(f)
 except:
     b_params = PRIOR.sample(sample_shape=(B, ))
     b_samples = simulator(b_params)
     b_params.shape, b_samples.shape
-    snpe = SNPE(
+    fmpe = FMPE(
         prior=PRIOR,
-        density_estimator='maf',
+        # density_estimator='maf',
         device='cpu'
     )
 
-    _ = snpe.append_simulations(b_params, b_samples).train()
-    snpe_posterior = snpe.build_posterior()
-    with open('results/uniform_prior/snpe_uniform_prior.pkl', 'wb') as f:
-        dill.dump(snpe_posterior, f)
+    _ = fmpe.append_simulations(b_params, b_samples).train()
+    fmpe_posterior = fmpe.build_posterior()
+    with open('results/uniform_prior/fmpe_uniform_prior.pkl', 'wb') as f:
+        dill.dump(fmpe_posterior, f)
 
 ### VSI
 b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
@@ -97,7 +97,7 @@ try:
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='p-values',
+        calibration_method='critical-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
             'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
@@ -107,12 +107,12 @@ try:
         retrain_calibration=False
     )
 except:
-    lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=snpe_posterior, **POSTERIOR_KWARGS))
+    lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=fmpe_posterior, **POSTERIOR_KWARGS))
     confidence_sets = lf2i.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='p-values',
+        calibration_method='critical-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
             'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
@@ -131,7 +131,7 @@ try:
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='p-values',
+        calibration_method='critical-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
             'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
@@ -141,12 +141,12 @@ try:
         retrain_calibration=False
     )
 except:
-    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=snpe_posterior, estimation_method='posterior', num_posterior_samples=50_000, **POSTERIOR_KWARGS))
+    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=fmpe_posterior, estimation_method='posterior', num_posterior_samples=10_000,))
     confidence_setsw = lf2iw.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='p-values',
+        calibration_method='critical-values',
         calibration_model='cat-gb',
         calibration_model_kwargs={
             'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
@@ -165,7 +165,7 @@ for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
     credible_sets_x = []
     for cl in CONFIDENCE_LEVEL:
         actual_cred_level, credible_set = hpd_region(
-            posterior=snpe_posterior,
+            posterior=fmpe_posterior,
             param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
             x=x.reshape(-1, ),
             credible_level=cl,
@@ -317,7 +317,7 @@ except:
         diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2i.diagnostics(
             region_type='lf2i',
             confidence_level=cl,
-            calibration_method='p-values',
+            calibration_method='critical-values',
             coverage_estimator='splines',
             T_double_prime=(b_double_prime_params, b_double_prime_samples),
         )
@@ -338,7 +338,7 @@ except:
         diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2iw.diagnostics(
             region_type='lf2i',
             confidence_level=cl,
-            calibration_method='p-values',
+            calibration_method='critical-values',
             coverage_estimator='splines',
             T_double_prime=(b_double_prime_params, b_double_prime_samples),
         )
@@ -400,7 +400,7 @@ except:
         x=samples_for_size,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='p-values',
+        calibration_method='critical-values',
     )
     confset_sizes = np.array([100*cs.shape[0]/size_grid_for_sizes for cs in confidence_sets_for_size[0]])
     with open('results/uniform_prior/confidence_sets_for_size.pkl', 'wb') as f:
@@ -434,7 +434,7 @@ except:
         x=samples_for_size,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
         confidence_level=CONFIDENCE_LEVEL,
-        calibration_method='p-values',
+        calibration_method='critical-values',
     )
     confset_sizes = np.array([100*cs.shape[0]/size_grid_for_sizes for cs in confidence_sets_for_size[0]])
     with open('results/uniform_prior/confidence_sets_for_size_waldo.pkl', 'wb') as f:
