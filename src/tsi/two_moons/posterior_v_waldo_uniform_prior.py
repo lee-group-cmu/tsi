@@ -26,8 +26,9 @@ POI_DIM = 2  # parameter of interest
 PRIOR_LOC = [0, 0]
 PRIOR_VAR = 0.1 # (6*np.sqrt(2.0))**2
 POI_BOUNDS = {r'$\theta_1$': (-1, 1), r'$\theta_2$': (-1, 1)}
-PRIOR = MultivariateNormal(
-    loc=torch.Tensor([0.5, 0.5]), covariance_matrix=PRIOR_VAR*torch.eye(n=POI_DIM)
+PRIOR = BoxUniform(
+    low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
+    high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
 )
 
 B = 150_000  # num simulations to estimate posterior and test statistics
@@ -46,7 +47,7 @@ EVAL_GRID_DISTR = BoxUniform(
 )
 
 POSTERIOR_KWARGS = {
-    # 'norm_posterior': None
+    'norm_posterior': None
 }
 DEVICE = 'cpu'
 task = sbibm.get_task('two_moons')
@@ -54,7 +55,7 @@ simulator = task.get_simulator()
 
 ### NDE
 try:
-    with open('results/strong_prior/fmpe_strong_prior.pkl', 'rb') as f:
+    with open('results/uniform_prior/fmpe_uniform_prior.pkl', 'rb') as f:
         fmpe_posterior = dill.load(f)
 except:
     b_params = PRIOR.sample(sample_shape=(B, ))
@@ -68,7 +69,7 @@ except:
 
     _ = fmpe.append_simulations(b_params, b_samples).train()
     fmpe_posterior = fmpe.build_posterior()
-    with open('results/strong_prior/fmpe_strong_prior.pkl', 'wb') as f:
+    with open('results/uniform_prior/fmpe_uniform_prior.pkl', 'wb') as f:
         dill.dump(fmpe_posterior, f)
 
 ### VSI
@@ -76,21 +77,21 @@ b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
 b_prime_samples = simulator(b_prime_params)
 b_prime_params.shape, b_prime_samples.shape
 try:
-    with open('results/strong_prior/obs_x_theta.pkl', 'rb') as f:
+    with open('results/uniform_prior/obs_x_theta.pkl', 'rb') as f:
         examples = dill.load(f)
         true_theta = examples['true_theta']
         obs_x = examples['obs_x']
 except:
     true_theta = torch.Tensor([[0, 0], [0.5, -0.5], [-0.5, 0.5], [-0.5, -0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5], [0.5, 0.5]])
     obs_x = simulator(true_theta)
-    with open('results/strong_prior/obs_x_theta.pkl', 'wb') as f:
+    with open('results/uniform_prior/obs_x_theta.pkl', 'wb') as f:
         dill.dump({
             'true_theta': true_theta,
             'obs_x': obs_x
         }, f)
 
 try:
-    with open('results/strong_prior/lf2i_strong_prior.pkl', 'rb') as f:
+    with open('results/uniform_prior/lf2i_uniform_prior.pkl', 'rb') as f:
         lf2i = dill.load(f)
     confidence_sets = lf2i.inference(
         x=obs_x,
@@ -120,11 +121,11 @@ except:
         T_prime=(b_prime_params, b_prime_samples),
         retrain_calibration=False
     )
-    with open('results/strong_prior/lf2i_strong_prior.pkl', 'wb') as f:
+    with open('results/uniform_prior/lf2i_uniform_prior.pkl', 'wb') as f:
         dill.dump(lf2i, f)
 
 try:
-    with open('results/strong_prior/lf2i_strong_prior_waldo.pkl', 'rb') as f:
+    with open('results/uniform_prior/lf2i_uniform_prior_waldo.pkl', 'rb') as f:
         lf2iw = dill.load(f)
     confidence_setsw = lf2iw.inference(
         x=obs_x,
@@ -154,7 +155,7 @@ except:
         T_prime=(b_prime_params, b_prime_samples),
         retrain_calibration=False
     )
-    with open('results/strong_prior/lf2i_strong_prior_waldo.pkl', 'wb') as f:
+    with open('results/uniform_prior/lf2i_uniform_prior_waldo.pkl', 'wb') as f:
         dill.dump(lf2iw, f)
 
 remaining = len(obs_x)
@@ -220,7 +221,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/strong_prior/hpd{idx_obs}.png',
+        save_fig_path=f'results/uniform_prior/hpd{idx_obs}.png',
         remove_legend=True,
         title=title,
         custom_ax=None
@@ -252,7 +253,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/strong_prior/freb{idx_obs}.png',
+        save_fig_path=f'results/uniform_prior/freb{idx_obs}.png',
         remove_legend=True,
         title='FreB with Posterior',
         custom_ax=None
@@ -284,27 +285,27 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/strong_prior/freb_waldo{idx_obs}.png',
+        save_fig_path=f'results/uniform_prior/freb_waldo{idx_obs}.png',
         remove_legend=True,
         title='FreB with Waldo',
         custom_ax=None
     )
 
 try:
-    with open('results/strong_prior/diagn_confset_strong_prior.pkl', 'rb') as f:
+    with open('results/uniform_prior/diagn_confset_uniform_prior.pkl', 'rb') as f:
         diagn_objects = dill.load(f)
-    with open('results/strong_prior/diagn_confset_strong_prior_waldo.pkl', 'rb') as f:
+    with open('results/uniform_prior/diagn_confset_uniform_prior_waldo.pkl', 'rb') as f:
         diagn_objectsw = dill.load(f)
-    with open('results/strong_prior/diagn_cred_strong_prior.pkl', 'rb') as f:
+    with open('results/uniform_prior/diagn_cred_uniform_prior.pkl', 'rb') as f:
         diagn_objects_cred = dill.load(f)
-    with open('results/strong_prior/b_double_prime.pkl', 'rb') as f:
+    with open('results/uniform_prior/b_double_prime.pkl', 'rb') as f:
         b_double_prime = dill.load(f)
         b_double_prime_params, b_double_prime_samples = b_double_prime['params'], b_double_prime['samples']
 except:
     b_double_prime_params = REFERENCE.sample(sample_shape=(B_DOUBLE_PRIME, ))
     b_double_prime_samples = simulator(b_double_prime_params)
     b_double_prime_params.shape, b_double_prime_samples.shape
-    with open('results/strong_prior/b_double_prime.pkl', 'wb') as f:
+    with open('results/uniform_prior/b_double_prime.pkl', 'wb') as f:
         dill.dump({
             'params': b_double_prime_params,
             'samples': b_double_prime_samples
@@ -321,14 +322,14 @@ except:
             T_double_prime=(b_double_prime_params, b_double_prime_samples),
         )
         diagn_objects[cl] = (diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset)
-    with open('results/strong_prior/diagn_confset_strong_prior.pkl', 'wb') as f:
+    with open('results/uniform_prior/diagn_confset_uniform_prior.pkl', 'wb') as f:
         dill.dump(diagn_objects, f)
 
     plt.scatter(out_parameters_confset[:, 0], out_parameters_confset[:, 1], c=mean_proba_confset)
     plt.title('Coverage of FreB confidence sets')
     plt.clim(vmin=0, vmax=1)
     plt.colorbar()
-    plt.savefig('results/strong_prior/freb_coverage')
+    plt.savefig('results/uniform_prior/freb_coverage')
     plt.close()
 
     diagn_objectsw = {}
@@ -342,14 +343,14 @@ except:
             T_double_prime=(b_double_prime_params, b_double_prime_samples),
         )
         diagn_objects[cl] = (diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset)
-    with open('results/strong_prior/diagn_confset_strong_prior_waldo.pkl', 'wb') as f:
+    with open('results/uniform_prior/diagn_confset_uniform_prior_waldo.pkl', 'wb') as f:
         dill.dump(diagn_objectsw, f)
 
     plt.scatter(out_parameters_confset[:, 0], out_parameters_confset[:, 1], c=mean_proba_confset)
     plt.title('Coverage of Waldo confidence sets')
     plt.clim(vmin=0, vmax=1)
     plt.colorbar()
-    plt.savefig('results/strong_prior/waldo_coverage')
+    plt.savefig('results/uniform_prior/waldo_coverage')
     plt.close()
 
     diagn_objects_cred = {}
@@ -367,20 +368,20 @@ except:
             **POSTERIOR_KWARGS
         )
         diagn_objects_cred[cl] = (diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes)
-    with open('results/strong_prior/diagn_cred_strong_prior.pkl', 'wb') as f:
+    with open('results/uniform_prior/diagn_cred_uniform_prior.pkl', 'wb') as f:
         dill.dump(diagn_objects_cred, f)
 
     plt.scatter(out_parameters_credible[:, 0], out_parameters_credible[:, 1], c=mean_proba_credible)
     plt.title('Coverage of credible regions')
     plt.clim(vmin=0, vmax=1)
     plt.colorbar()
-    plt.savefig('results/strong_prior/hpd_coverage')
+    plt.savefig('results/uniform_prior/hpd_coverage')
     plt.close()
 
 try:
-    with open('results/strong_prior/confidence_sets_for_size.pkl', 'rb') as f:
+    with open('results/uniform_prior/confidence_sets_for_size.pkl', 'rb') as f:
         confidence_sets_for_size = dill.load(f)
-    with open('results/strong_prior/set_for_size.pkl', 'rb') as f:
+    with open('results/uniform_prior/set_for_size.pkl', 'rb') as f:
         set_for_size = dill.load(f)
         params_for_size = set_for_size['params']
         samples_for_size = set_for_size['samples']
@@ -388,7 +389,7 @@ except:
     params_for_size = EVAL_GRID_DISTR.sample(sample_shape=(B_DOUBLE_PRIME, ))
     samples_for_size = simulator(params_for_size)
     params_for_size.shape, samples_for_size.shape
-    with open('results/strong_prior/set_for_size.pkl', 'wb') as f:
+    with open('results/uniform_prior/set_for_size.pkl', 'wb') as f:
         dill.dump({
             'params': params_for_size,
             'samples': samples_for_size
@@ -402,7 +403,7 @@ except:
         calibration_method='critical-values',
     )
     confset_sizes = np.array([100*cs.shape[0]/size_grid_for_sizes for cs in confidence_sets_for_size[0]])
-    with open('results/strong_prior/confidence_sets_for_size.pkl', 'wb') as f:
+    with open('results/uniform_prior/confidence_sets_for_size.pkl', 'wb') as f:
         dill.dump(confidence_sets_for_size, f)
 
     set_size_plot(
@@ -412,7 +413,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 50),
         title='FreB sizes',
-        save_fig_path='results/strong_prior/freb_sizes_0_50.png'
+        save_fig_path='results/uniform_prior/freb_sizes_0_50.png'
     )
 
     set_size_plot(
@@ -422,11 +423,11 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 100),
         title='FreB sizes',
-        save_fig_path='results/strong_prior/freb_sizes.png'
+        save_fig_path='results/uniform_prior/freb_sizes.png'
     )
 
 try:
-    with open('results/strong_prior/confidence_sets_for_size_waldo.pkl', 'rb') as f:
+    with open('results/uniform_prior/confidence_sets_for_size_waldo.pkl', 'rb') as f:
         confidence_sets_for_size = dill.load(f)
 except:
     confidence_sets_for_size = lf2iw.inference(
@@ -436,7 +437,7 @@ except:
         calibration_method='critical-values',
     )
     confset_sizes = np.array([100*cs.shape[0]/size_grid_for_sizes for cs in confidence_sets_for_size[0]])
-    with open('results/strong_prior/confidence_sets_for_size_waldo.pkl', 'wb') as f:
+    with open('results/uniform_prior/confidence_sets_for_size_waldo.pkl', 'wb') as f:
         dill.dump(confidence_sets_for_size, f)
 
     set_size_plot(
@@ -446,7 +447,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 50),
         title='Waldo sizes',
-        save_fig_path='results/strong_prior/waldo_sizes_0_50.png'
+        save_fig_path='results/uniform_prior/waldo_sizes_0_50.png'
     )
 
     set_size_plot(
@@ -456,5 +457,5 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 100),
         title='Waldo sizes',
-        save_fig_path='results/strong_prior/waldo_sizes.png'
+        save_fig_path='results/uniform_prior/waldo_sizes.png'
     )
