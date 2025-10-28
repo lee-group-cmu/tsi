@@ -31,8 +31,8 @@ PRIOR = BoxUniform(
     high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
 )
 
-B = 100_000  # num simulations to estimate posterior and test statistics
-B_PRIME = 50_000  # num simulations to estimate critical values
+B = 150_000  # num simulations to estimate posterior and test statistics
+B_PRIME = 75_000  # num simulations to estimate critical values
 B_DOUBLE_PRIME = 30_000  # num simulations to do diagnostics
 EVAL_GRID_SIZE = 50_000  # num evaluation points over parameter space to construct confidence sets
 CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
@@ -141,7 +141,7 @@ try:
         retrain_calibration=False
     )
 except:
-    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=fmpe_posterior, estimation_method='posterior', num_posterior_samples=10_000,))
+    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=fmpe_posterior, estimation_method='posterior', num_posterior_samples=50_000,))
     confidence_setsw = lf2iw.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
