@@ -54,7 +54,7 @@ DEVICE = 'cpu'
 task = sbibm.get_task('two_moons')
 simulator = task.get_simulator()
 
-experiment_dir = 'results/snpe/uniform_prior'
+experiment_dir = f'{experiment_dir}'
 os.makedirs(experiment_dir, exist_ok=True)
 
 ### NDE
@@ -225,7 +225,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/snpe/uniform_prior/hpd{idx_obs}.png',
+        save_fig_path=f'{experiment_dir}/hpd{idx_obs}.png',
         remove_legend=True,
         title=title,
         custom_ax=None
@@ -257,7 +257,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/snpe/uniform_prior/freb{idx_obs}.png',
+        save_fig_path=f'{experiment_dir}/freb{idx_obs}.png',
         remove_legend=True,
         title='FreB with Posterior',
         custom_ax=None
@@ -289,7 +289,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/snpe/uniform_prior/freb_waldo{idx_obs}.png',
+        save_fig_path=f'{experiment_dir}/freb_waldo{idx_obs}.png',
         remove_legend=True,
         title='FreB with Waldo',
         custom_ax=None
@@ -417,7 +417,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 50),
         title='FreB sizes',
-        save_fig_path='results/snpe/uniform_prior/freb_sizes_0_50.png'
+        save_fig_path=f'{experiment_dir}/freb_sizes_0_50.png'
     )
 
     set_size_plot(
@@ -427,7 +427,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 100),
         title='FreB sizes',
-        save_fig_path='results/snpe/uniform_prior/freb_sizes.png'
+        save_fig_path=f'{experiment_dir}/freb_sizes.png'
     )
 
 try:
@@ -451,7 +451,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 50),
         title='Waldo sizes',
-        save_fig_path='results/snpe/uniform_prior/waldo_sizes_0_50.png'
+        save_fig_path=f'{experiment_dir}/waldo_sizes_0_50.png'
     )
 
     set_size_plot(
@@ -461,5 +461,5 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 100),
         title='Waldo sizes',
-        save_fig_path='results/snpe/uniform_prior/waldo_sizes.png'
+        save_fig_path=f'{experiment_dir}/waldo_sizes.png'
     )
