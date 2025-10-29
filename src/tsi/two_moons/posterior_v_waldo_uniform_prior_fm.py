@@ -54,27 +54,27 @@ DEVICE = 'cpu'
 task = sbibm.get_task('two_moons')
 simulator = task.get_simulator()
 
-experiment_dir = 'results/snpe/uniform_prior'
+experiment_dir = 'results/fmpe/uniform_prior'
 os.makedirs(experiment_dir, exist_ok=True)
 
 ### NDE
 try:
-    with open(f'{experiment_dir}/snpe_uniform_prior.pkl', 'rb') as f:
-        snpe_posterior = dill.load(f)
+    with open(f'{experiment_dir}/fmpe_uniform_prior.pkl', 'rb') as f:
+        fmpe_posterior = dill.load(f)
 except:
     b_params = PRIOR.sample(sample_shape=(B, ))
     b_samples = simulator(b_params)
     b_params.shape, b_samples.shape
-    snpe = SNPE(
+    fmpe = FMPE(
         prior=PRIOR,
-        density_estimator='maf',
+        # density_estimator='maf',
         device='cpu'
     )
 
-    _ = snpe.append_simulations(b_params, b_samples).train()
-    snpe_posterior = snpe.build_posterior()
-    with open(f'{experiment_dir}/snpe_uniform_prior.pkl', 'wb') as f:
-        dill.dump(snpe_posterior, f)
+    _ = fmpe.append_simulations(b_params, b_samples).train()
+    fmpe_posterior = fmpe.build_posterior()
+    with open(f'{experiment_dir}/fmpe_uniform_prior.pkl', 'wb') as f:
+        dill.dump(fmpe_posterior, f)
 
 ### VSI
 b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
@@ -111,7 +111,7 @@ try:
         retrain_calibration=False
     )
 except:
-    lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=snpe_posterior, **POSTERIOR_KWARGS))
+    lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=fmpe_posterior, **POSTERIOR_KWARGS))
     confidence_sets = lf2i.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
@@ -145,7 +145,7 @@ try:
         retrain_calibration=False
     )
 except:
-    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=snpe_posterior, estimation_method='posterior', num_posterior_samples=50_000,))
+    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=fmpe_posterior, estimation_method='posterior', num_posterior_samples=50_000,))
     confidence_setsw = lf2iw.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
@@ -169,7 +169,7 @@ for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
     credible_sets_x = []
     for cl in CONFIDENCE_LEVEL:
         actual_cred_level, credible_set = hpd_region(
-            posterior=snpe_posterior,
+            posterior=fmpe_posterior,
             param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
             x=x.reshape(-1, ),
             credible_level=cl,
@@ -225,7 +225,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/snpe/uniform_prior/hpd{idx_obs}.png',
+        save_fig_path=f'{experiment_dir}/hpd{idx_obs}.png',
         remove_legend=True,
         title=title,
         custom_ax=None
@@ -257,7 +257,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/snpe/uniform_prior/freb{idx_obs}.png',
+        save_fig_path=f'{experiment_dir}/freb{idx_obs}.png',
         remove_legend=True,
         title='FreB with Posterior',
         custom_ax=None
@@ -289,7 +289,7 @@ for idx_obs in range(8):
         alpha=3,
         scatter=True,
         figsize=(5, 5),
-        save_fig_path=f'results/snpe/uniform_prior/freb_waldo{idx_obs}.png',
+        save_fig_path=f'{experiment_dir}/freb_waldo{idx_obs}.png',
         remove_legend=True,
         title='FreB with Waldo',
         custom_ax=None
@@ -417,7 +417,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 50),
         title='FreB sizes',
-        save_fig_path='results/snpe/uniform_prior/freb_sizes_0_50.png'
+        save_fig_path='{experiment_dir}/freb_sizes_0_50.png'
     )
 
     set_size_plot(
@@ -427,7 +427,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 100),
         title='FreB sizes',
-        save_fig_path='results/snpe/uniform_prior/freb_sizes.png'
+        save_fig_path='{experiment_dir}/freb_sizes.png'
     )
 
 try:
@@ -451,7 +451,7 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 50),
         title='Waldo sizes',
-        save_fig_path='results/snpe/uniform_prior/waldo_sizes_0_50.png'
+        save_fig_path='{experiment_dir}/waldo_sizes_0_50.png'
     )
 
     set_size_plot(
@@ -461,5 +461,5 @@ except:
         figsize=(10, 10),
         vmin_vmax=(0, 100),
         title='Waldo sizes',
-        save_fig_path='results/snpe/uniform_prior/waldo_sizes.png'
+        save_fig_path='{experiment_dir}/waldo_sizes.png'
     )
