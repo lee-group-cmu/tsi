@@ -54,7 +54,7 @@ DEVICE = 'cpu'
 task = sbibm.get_task('two_moons')
 simulator = task.get_simulator()
 
-experiment_dir = f'{experiment_dir}'
+experiment_dir = 'results/snpe/uniform_prior' # f'{experiment_dir}'
 os.makedirs(experiment_dir, exist_ok=True)
 
 ### NDE

@@ -31,9 +31,9 @@ PRIOR = MultivariateNormal(
     loc=torch.Tensor([0.5, 0.5]), covariance_matrix=PRIOR_VAR*torch.eye(n=POI_DIM)
 )
 
-B = 100_000  # num simulations to estimate posterior and test statistics
-B_PRIME = 50_000  # num simulations to estimate critical values
-B_DOUBLE_PRIME = 30_000  # num simulations to do diagnostics
+B = 50_000  # num simulations to estimate posterior and test statistics
+B_PRIME = 30_000  # num simulations to estimate critical values
+B_DOUBLE_PRIME = 20_000  # num simulations to do diagnostics
 EVAL_GRID_SIZE = 10_000  # num evaluation points over parameter space to construct confidence sets
 CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
@@ -127,6 +127,8 @@ except:
     )
     with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'wb') as f:
         dill.dump(lf2i, f)
+    with open(f'{experiment_dir}/confidence_sets.pkl', 'wb') as f:
+        dill.dump(confidence_sets, f)
 
 try:
     with open(f'{experiment_dir}/lf2i_strong_prior_waldo.pkl', 'rb') as f:
@@ -145,7 +147,7 @@ try:
         retrain_calibration=False
     )
 except:
-    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=fmpe_posterior, estimation_method='posterior', num_posterior_samples=50_000,))
+    lf2iw = LF2I(test_statistic=Waldo(poi_dim=2, estimator=fmpe_posterior, estimation_method='posterior', num_posterior_samples=10_000,))
     confidence_setsw = lf2iw.inference(
         x=obs_x,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
@@ -161,6 +163,8 @@ except:
     )
     with open(f'{experiment_dir}/lf2i_strong_prior_waldo.pkl', 'wb') as f:
         dill.dump(lf2iw, f)
+    with open(f'{experiment_dir}/confidence_sets_waldo.pkl', 'wb') as f:
+        dill.dump(confidence_setsw, f)
 
 remaining = len(obs_x)
 credible_sets = []
@@ -180,6 +184,9 @@ for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
         credible_sets_x.append(credible_set)
     credible_sets.append(credible_sets_x)
     remaining -= 1
+
+with open(f'{experiment_dir}/credible_sets.pkl', 'wb') as f:
+    dill.dump(credible_sets, f)
 
 plt.rc('text', usetex=True)  # Enable LaTeX
 plt.rc('font', family='serif')  # Use a serif font (e.g., Computer Modern)
@@ -399,7 +406,7 @@ except:
             'samples': samples_for_size
         }, f)
 
-    size_grid_for_sizes = 5_000
+    size_grid_for_sizes = 1_000
     confidence_sets_for_size = lf2i.inference(
         x=samples_for_size,
         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
