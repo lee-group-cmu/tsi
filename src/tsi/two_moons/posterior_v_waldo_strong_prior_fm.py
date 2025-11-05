@@ -172,27 +172,27 @@ except:
     with open(f'{experiment_dir}/confidence_sets_waldo.pkl', 'wb') as f:
         dill.dump(confidence_setsw, f)
 
-remaining = len(obs_x)
-credible_sets = []
-for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
-    print(f'Remaining: {remaining}', flush=True)
-    credible_sets_x = []
-    for cl in CONFIDENCE_LEVEL:
-        actual_cred_level, credible_set = hpd_region(
-            posterior=fmpe_posterior,
-            param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
-            x=x.reshape(-1, ),
-            credible_level=cl,
-            num_level_sets=10_000,
-            **POSTERIOR_KWARGS
-        )
-        #print(actual_cred_level, flush=True)
-        credible_sets_x.append(credible_set)
-    credible_sets.append(credible_sets_x)
-    remaining -= 1
+# remaining = len(obs_x)
+# credible_sets = []
+# for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
+#     print(f'Remaining: {remaining}', flush=True)
+#     credible_sets_x = []
+#     for cl in CONFIDENCE_LEVEL:
+#         actual_cred_level, credible_set = hpd_region(
+#             posterior=fmpe_posterior,
+#             param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
+#             x=x.reshape(-1, ),
+#             credible_level=cl,
+#             num_level_sets=10_000,
+#             **POSTERIOR_KWARGS
+#         )
+#         #print(actual_cred_level, flush=True)
+#         credible_sets_x.append(credible_set)
+#     credible_sets.append(credible_sets_x)
+#     remaining -= 1
 
-with open(f'{experiment_dir}/credible_sets.pkl', 'wb') as f:
-    dill.dump(credible_sets, f)
+# with open(f'{experiment_dir}/credible_sets.pkl', 'wb') as f:
+#     dill.dump(credible_sets, f)
 
 plt.rc('text', usetex=True)  # Enable LaTeX
 plt.rc('font', family='serif')  # Use a serif font (e.g., Computer Modern)
@@ -203,46 +203,46 @@ plt.rcParams['text.latex.preamble'] = r'''
     \usepackage{underscore} % If underscores are needed
 '''
 
-for idx_obs in range(8):
+# for idx_obs in range(8):
 
-    if idx_obs <= 4:
-        title = r'\textbf{a)} Prior poorly aligned with $\theta^{\star}$'
-    else:
-        title = r'\textbf{b)} Prior well aligned with $\theta^{\star}$'
+#     if idx_obs <= 4:
+#         title = r'\textbf{a)} Prior poorly aligned with $\theta^{\star}$'
+#     else:
+#         title = r'\textbf{b)} Prior well aligned with $\theta^{\star}$'
 
-    plot_parameter_regions(
-        *credible_sets[idx_obs], #*[confidence_sets[j][idx_obs] for j in range(len(CONFIDENCE_LEVEL))],
-        param_dim=2,
-        true_parameter=true_theta[idx_obs, :],
-        prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
-        parameter_space_bounds={
-            r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
-            r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
-        },
-        # parameter_space_bounds={
-        #     r'$\theta_1$': dict(zip(['low', 'high'], [-1.0, 1.0])), 
-        #     r'$\theta_2$': dict(zip(['low', 'high'], [-1.0, 1.0])), 
-        # },
-        colors=[
-            'purple', 'deeppink', # 'hotpink',  # credible sets
-            #'teal', 'mediumseagreen', 'darkseagreen', # confidence sets
-        ],
-        region_names=[
-            *[f'HPD {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
-            #*[f'CS {cl*100:.1f}%' for cl in CONFIDENCE_LEVEL],
-        ],
-        labels=[r'$\theta_1$', r'$\theta_2$'],
-        linestyles=['-', '--'],  # , ':'
-        param_names=[r'$\theta_1$', r'$\theta_2$'],
-        alpha_shape=False,
-        alpha=3,
-        scatter=True,
-        figsize=(5, 5),
-        save_fig_path=f'{experiment_dir}/hpd{idx_obs}.png',
-        remove_legend=True,
-        title=title,
-        custom_ax=None
-    )
+#     plot_parameter_regions(
+#         *credible_sets[idx_obs], #*[confidence_sets[j][idx_obs] for j in range(len(CONFIDENCE_LEVEL))],
+#         param_dim=2,
+#         true_parameter=true_theta[idx_obs, :],
+#         prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
+#         parameter_space_bounds={
+#             r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
+#             r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
+#         },
+#         # parameter_space_bounds={
+#         #     r'$\theta_1$': dict(zip(['low', 'high'], [-1.0, 1.0])), 
+#         #     r'$\theta_2$': dict(zip(['low', 'high'], [-1.0, 1.0])), 
+#         # },
+#         colors=[
+#             'purple', 'deeppink', # 'hotpink',  # credible sets
+#             #'teal', 'mediumseagreen', 'darkseagreen', # confidence sets
+#         ],
+#         region_names=[
+#             *[f'HPD {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
+#             #*[f'CS {cl*100:.1f}%' for cl in CONFIDENCE_LEVEL],
+#         ],
+#         labels=[r'$\theta_1$', r'$\theta_2$'],
+#         linestyles=['-', '--'],  # , ':'
+#         param_names=[r'$\theta_1$', r'$\theta_2$'],
+#         alpha_shape=False,
+#         alpha=3,
+#         scatter=True,
+#         figsize=(5, 5),
+#         save_fig_path=f'{experiment_dir}/hpd{idx_obs}.png',
+#         remove_legend=True,
+#         title=title,
+#         custom_ax=None
+#     )
 
 for idx_obs in range(8):
 

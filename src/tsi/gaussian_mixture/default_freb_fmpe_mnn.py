@@ -100,7 +100,8 @@ def main(hidden_layers,
     simulator = task.get_simulator()
 
     try:
-        with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'rb') as f:
+        # with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'rb') as f:
+        with open('results/fmpe/fmpe_strong_prior.pkl', 'rb') as f:
             fmpe_posterior = dill.load(f)
         print('FMPE loaded...')
     except:
@@ -114,7 +115,7 @@ def main(hidden_layers,
 
         _ = fmpe.append_simulations(b_params, b_samples).train()
         fmpe_posterior = fmpe.build_posterior()
-        with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'wb') as f:
+        with open('results/fmpe/fmpe_strong_prior.pkl', 'wb') as f:
             dill.dump(fmpe_posterior, f)
     b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
     b_prime_samples = simulator(b_prime_params)
