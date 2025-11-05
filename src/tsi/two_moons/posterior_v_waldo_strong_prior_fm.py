@@ -1,3 +1,4 @@
+from datetime import datetime
 from tqdm import tqdm
 import dill
 import os
@@ -10,6 +11,7 @@ import seaborn as sns
 import torch
 from torch.distributions import MultivariateNormal
 from sbi.inference import FMPE, SNPE, NPSE
+from sbi.neural_nets import posterior_flow_nn
 from sbi.analysis import pairplot
 from sbi.utils import BoxUniform
 import sbibm
@@ -53,7 +55,7 @@ DEVICE = 'cpu'
 task = sbibm.get_task('two_moons')
 simulator = task.get_simulator()
 
-experiment_dir = 'results/fmpe/strong_prior'
+experiment_dir = f'results/fmpe/strong_prior/{datetime.now()}'
 os.makedirs(experiment_dir, exist_ok=True)
 
 
@@ -65,10 +67,14 @@ except:
     b_params = PRIOR.sample(sample_shape=(B, ))
     b_samples = simulator(b_params)
     b_params.shape, b_samples.shape
+    net_builder = posterior_flow_nn(
+        model='mlp',
+        num_layers=3,
+    )
     fmpe = FMPE(
         prior=PRIOR,
-        # density_estimator='maf',
-        device='cpu'
+        vf_estimator=net_builder,
+        device='cpu',
     )
 
     _ = fmpe.append_simulations(b_params, b_samples).train()
