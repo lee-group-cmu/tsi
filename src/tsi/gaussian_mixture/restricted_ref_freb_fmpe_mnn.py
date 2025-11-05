@@ -23,7 +23,7 @@ from lf2i.utils.other_methods import hpd_region
 from lf2i.plot.parameter_regions import plot_parameter_regions
 from lf2i.plot.coverage_diagnostics import coverage_probability_plot
 from lf2i.plot.power_diagnostics import set_size_plot
-from tsi.common.monotone_nn import train_monotonic_nn
+from tsi.common.monotone_nn import train_monotonic_nn, MonotonicNN
 from tsi.common.utils import create_experiment_hash, IntList, TrainingLogger
 from tsi.temp.utils import kdeplots2D
 
@@ -97,9 +97,11 @@ def main(hidden_layers,
     DEVICE = 'cpu'
     task = sbibm.get_task('gaussian_mixture')
     simulator = task.get_simulator()
+
     try:
         with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'rb') as f:
             fmpe_posterior = dill.load(f)
+        print('FMPE loaded...')
     except:
         b_params = PRIOR.sample(sample_shape=(B, ))
         b_samples = simulator(b_params)
@@ -130,82 +132,89 @@ def main(hidden_layers,
                 'obs_x': obs_x
             }, f)
 
-    lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=fmpe_posterior,))
-    logger = TrainingLogger(f'{experiment_dir}/logs')
-    model, input_bounds = train_monotonic_nn(
-        T_prime=(b_prime_params, b_prime_samples),
-        test_statistic=lf2i.test_statistic,
-        config=FREB_KWARGS,
-        logger=logger
-    )
-    with open(f'{experiment_dir}/input_bounds.pkl', 'wb') as f:
-        dill.dump(input_bounds, f)
-
-    logger.save_losses()
-    logger.save_losses_csv()
-    logger.plot_training_curves()
-    logger.print_summary()
-
     try:
         with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'rb') as f:
             lf2i = dill.load(f)
-        confidence_sets = lf2i.inference(
-            x=obs_x,
-            evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
-            confidence_level=CONFIDENCE_LEVEL,
-            calibration_method='p-values',
-            calibration_model=model,
-            calibration_model_kwargs={
-                # 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
-                # 'n_iter': 25
-                'cv': {'iterations': [100], 'depth': [3]},
-                'n_iter': 1
-            },
-            T_prime=(b_prime_params, b_prime_samples),
-            retrain_calibration=False
+        print('LF2I loaded...')
+        with open(f"{experiment_dir}/input_bounds.pkl", 'rb') as f:
+            input_bounds = dill.load(f)
+
+        model = MonotonicNN(
+            in_d=POI_DIM + 1,
+            hidden_layers=FREB_KWARGS['hidden_layers'],
+            sigmoid=True,
+            input_bounds=input_bounds
         )
-    except:
-        lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=fmpe_posterior, **POSTERIOR_KWARGS))
-        confidence_sets = lf2i.inference(
-            x=obs_x,
-            evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
-            confidence_level=CONFIDENCE_LEVEL,
-            calibration_method='p-values',
-            calibration_model=model,
-            calibration_model_kwargs={
-                # 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
-                # 'n_iter': 25
-                'cv': {'iterations': [100], 'depth': [3]},
-                'n_iter': 1
-            },
+        model.load_state_dict(torch.load(f"{experiment_dir}/best_monotonic_nn.pt", weights_only=True))
+        model.eval()
+        print('MNN loaded...')
+
+        lf2i.calibration_model = {
+            'multiple_levels': model,
+        }
+    except Exception as e:
+        print(e)
+
+        lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=fmpe_posterior,))
+        logger = TrainingLogger(f'{experiment_dir}/logs')
+        model, input_bounds = train_monotonic_nn(
             T_prime=(b_prime_params, b_prime_samples),
-            retrain_calibration=False
+            test_statistic=lf2i.test_statistic,
+            config=FREB_KWARGS,
+            logger=logger
         )
+        with open(f'{experiment_dir}/input_bounds.pkl', 'wb') as f:
+            dill.dump(input_bounds, f)
+
+        logger.save_losses()
+        logger.save_losses_csv()
+        logger.plot_training_curves()
+        logger.print_summary()
+
         with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'wb') as f:
             dill.dump(lf2i, f)
+        lf2i.calibration_model = {
+            'multiple_levels': model,
+        }
+
+    try:
+        with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'rb') as f:
+            confidence_sets = dill.load(f)
+    except:
+        confidence_sets = lf2i.inference(
+            x=obs_x,
+            evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
+            confidence_level=CONFIDENCE_LEVEL,
+            calibration_method='p-values',
+            retrain_calibration=False
+        )
         with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'wb') as f:
             dill.dump(confidence_sets, f)
 
-    remaining = len(obs_x)
-    credible_sets = []
-    for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
-        print(f'Remaining: {remaining}', flush=True)
-        credible_sets_x = []
-        for cl in CONFIDENCE_LEVEL:
-            actual_cred_level, credible_set = hpd_region(
-                posterior=fmpe_posterior,
-                param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
-                x=x.reshape(-1, ),
-                credible_level=cl,
-                num_level_sets=10_000,
-                **POSTERIOR_KWARGS
-            )
-            #print(actual_cred_level, flush=True)
-            credible_sets_x.append(credible_set)
-        credible_sets.append(credible_sets_x)
-        remaining -= 1
-    with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'wb') as f:
-        dill.dump(credible_sets, f)
+    try:
+        with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'rb') as f:
+            credible_sets = dill.load(f)
+    except:
+        remaining = len(obs_x)
+        credible_sets = []
+        for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
+            print(f'Remaining: {remaining}', flush=True)
+            credible_sets_x = []
+            for cl in CONFIDENCE_LEVEL:
+                actual_cred_level, credible_set = hpd_region(
+                    posterior=fmpe_posterior,
+                    param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
+                    x=x.reshape(-1, ),
+                    credible_level=cl,
+                    num_level_sets=10_000,
+                    **POSTERIOR_KWARGS
+                )
+                #print(actual_cred_level, flush=True)
+                credible_sets_x.append(credible_set)
+            credible_sets.append(credible_sets_x)
+            remaining -= 1
+        with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'wb') as f:
+            dill.dump(credible_sets, f)
 
     plt.rc('text', usetex=True)  # Enable LaTeX
     plt.rc('font', family='serif')  # Use a serif font (e.g., Computer Modern)
@@ -217,6 +226,7 @@ def main(hidden_layers,
     '''
 
     for idx_obs, _ in enumerate(obs_x):
+        print(f'Making draft sets for pt {idx_obs}...')
 
         if idx_obs <= 4:
             title = r'\textbf{a)} Prior poorly aligned with $\theta^{\star}$'
@@ -295,6 +305,7 @@ def main(hidden_layers,
         with open(f'{experiment_dir}/b_double_prime.pkl', 'rb') as f:
             b_double_prime = dill.load(f)
             b_double_prime_params, b_double_prime_samples = b_double_prime['params'], b_double_prime['samples']
+        print(f'Loaded diagnostics stuff...')
     except:
         b_double_prime_params = REFERENCE.sample(sample_shape=(B_DOUBLE_PRIME, ))
         b_double_prime_samples = simulator(b_double_prime_params)
@@ -311,7 +322,7 @@ def main(hidden_layers,
             diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2i.diagnostics(
                 region_type='lf2i',
                 confidence_level=cl,
-                calibration_method='critical-values',
+                calibration_method='p-values',
                 coverage_estimator='splines',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
             )
@@ -350,6 +361,243 @@ def main(hidden_layers,
         plt.colorbar()
         plt.savefig(f'{experiment_dir}/hpd_coverage')
         plt.close()
+
+    plt.rc('text', usetex=True)  # Enable LaTeX
+    plt.rc('font', family='serif')  # Use a serif font (e.g., Computer Modern)
+    plt.rcParams['text.latex.preamble'] = r'''
+        \usepackage{amsmath}  % For \mathbb
+        \usepackage{amssymb}  % For \mathbb
+        \usepackage{bm}       % For bold math symbols
+        \usepackage{underscore} % If underscores are needed
+    '''
+
+    fig, ax = plt.subplots(2, 3, figsize=(25, 16))
+    fig.subplots_adjust(hspace=0.25)
+
+    print(f'Making final draft fig...')
+    plot_parameter_regions(
+        *credible_sets[1],
+        param_dim=2,
+        true_parameter=true_theta[1, :],
+        prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
+        parameter_space_bounds={
+            r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
+            r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
+        },
+        colors=[
+            'purple', 'deeppink', #'hotpink',  # credible sets
+        ],
+        region_names=[
+            *[f'HPD {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
+        ],
+        labels=[r'$\theta_1$', r'$\theta_2$'],
+        linestyles=['-', '--'], #':', 
+        param_names=[r'$\theta_1$', r'$\theta_2$'],
+        alpha_shape=True,
+        alpha=3,
+        scatter=False,
+        figsize=(5, 5),
+        remove_legend=False,
+        custom_ax=ax[0][0]
+    )
+    ax[0][0].set_xticklabels([])
+    ax[0][0].set_xlabel('')
+    ax[0][0].set_ylabel(r'$\theta_2$', fontsize=45)
+    ax[0][0].tick_params(labelsize=30)
+    ax[0][0].set_title(r'\textbf{Misaligned Prior}', size=50, pad=43)
+
+    plot_parameter_regions(
+        *[confidence_sets[j][1] for j in range(len(CONFIDENCE_LEVEL))],
+        param_dim=2,
+        true_parameter=true_theta[1, :],
+        prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
+        parameter_space_bounds={
+            r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
+            r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
+        },
+        colors=[
+            'teal', 'mediumseagreen', #'darkseagreen', # confidence sets
+        ],
+        region_names=[
+            *[f'FreB {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
+        ],
+        labels=[r'$\theta_1$', r'$\theta_2$'],
+        linestyles=['-', '--'], #':', 
+        param_names=[r'$\theta_1$', r'$\theta_2$'],
+        alpha_shape=True,
+        alpha=3,
+        scatter=False,
+        figsize=(5, 5),
+        remove_legend=False,
+        custom_ax=ax[1][0]
+    )
+    ax[1][0].tick_params(labelsize=30)
+    ax[1][0].set_xlabel(r'$\theta_1$', fontsize=45)
+    ax[1][0].set_ylabel(r'$\theta_2$', fontsize=45)
+
+
+    plot_parameter_regions(
+        *credible_sets[-1], #*[confidence_sets[j][idx_obs] for j in range(len(CONFIDENCE_LEVEL))],
+        param_dim=2,
+        true_parameter=true_theta[-1, :],
+        prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
+        parameter_space_bounds={
+            r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
+            r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
+        },
+        colors=[
+            'purple', 'deeppink', #'hotpink',  # credible sets
+        ],
+        region_names=[
+            *[f'HPD {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
+        ],
+        labels=[r'$\theta_1$', r'$\theta_2$'],
+        linestyles=['-', '--'], #':', 
+        param_names=[r'$\theta_1$', r'$\theta_2$'],
+        alpha_shape=True,
+        alpha=3,
+        scatter=False,
+        figsize=(5, 5),
+        remove_legend=True,
+        custom_ax=ax[0][1]
+    )
+    ax[0][1].set_xticklabels([])
+    ax[0][1].set_yticklabels([])
+    ax[0][1].set_xlabel('')
+    ax[0][1].set_ylabel('', fontsize=45)
+    ax[0][1].tick_params(labelsize=30)
+    ax[0][1].set_title(r'\textbf{Well-Aligned Prior}', size=50, pad=43)
+
+    plot_parameter_regions(
+        *[confidence_sets[j][-1] for j in range(len(CONFIDENCE_LEVEL))],
+        param_dim=2,
+        true_parameter=true_theta[-1, :],
+        prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
+        parameter_space_bounds={
+            r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
+            r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
+        },
+        colors=[
+            'teal', 'mediumseagreen', #'darkseagreen', # confidence sets
+        ],
+        region_names=[
+            #*[f'HPD {cl*100:.1f}%' for cl in CONFIDENCE_LEVEL],
+            *[f'FreB {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
+        ],
+        labels=[r'$\theta_1$', r'$\theta_2$'],
+        linestyles=['-', '--'], #':', 
+        param_names=[r'$\theta_1$', r'$\theta_2$'],
+        alpha_shape=True,
+        alpha=3,
+        scatter=False,
+        figsize=(5, 5),
+        remove_legend=True,
+        custom_ax=ax[1][1]
+    )
+    ax[1][1].tick_params(labelsize=30)
+    ax[1][1].set_yticklabels([])
+    ax[1][1].set_xlabel(r'$\theta_1$', fontsize=45)
+    ax[1][1].set_ylabel('', fontsize=45)
+
+
+    hpd_diagn_plot = coverage_probability_plot(
+        parameters=diagn_objects_cred[CONFIDENCE_LEVEL[0]][1],
+        coverage_probability=diagn_objects_cred[CONFIDENCE_LEVEL[0]][2],
+        confidence_level=CONFIDENCE_LEVEL[0],
+        param_dim=2,
+        vmin_vmax=(0, 100),
+        xlims=(-10, 10),
+        ylims=(-10, 10),
+        params_labels=(r'$\theta_1$', r'$\theta_2$'),
+        #figsize=(9, 7),
+        title=None,
+        show_text=False,
+        custom_ax=ax[0][2],
+    )
+    ax[0][2].set_xlim(-10, 10)
+    ax[0][2].set_ylim(-10, 10)
+    ax[0][2].set_xticks(np.linspace(-10, 10, 5).astype(int))
+    ax[0][2].set_yticks(np.linspace(-10, 10, 5).astype(int))
+    ax[0][2].set_xticklabels([])
+    ax[0][2].set_yticklabels([])
+    ax[0][2].set_xlabel('')
+    ax[0][2].set_ylabel('', fontsize=45, rotation=0)
+    ax[0][2].tick_params(labelsize=30)
+    ax[0][2].set_title(r'\textbf{Local Coverage}', size=50, pad=43)
+
+
+    _ = coverage_probability_plot(
+        parameters=diagn_objects[CONFIDENCE_LEVEL[0]][1],
+        coverage_probability=diagn_objects[CONFIDENCE_LEVEL[0]][2],
+        confidence_level=CONFIDENCE_LEVEL[0],
+        param_dim=2,
+        vmin_vmax=(0, 100),
+        params_labels=(r'$\theta_1$', r'$\theta_2$'),
+        xlims=(-10, 10),
+        ylims=(-10, 10),
+        #figsize=(9, 7),
+        title=None,
+        show_text=False,
+        custom_ax=ax[1][2],
+    )
+    ax[1][2].set_xlim(-10, 10)
+    ax[1][2].set_ylim(-10, 10)
+    ax[1][2].set_xticks(np.linspace(-10, 10, 5).astype(int))
+    ax[1][2].set_yticks(np.linspace(-10, 10, 5).astype(int))
+    ax[1][2].tick_params(labelsize=30)
+    ax[1][2].set_yticklabels([])
+    ax[1][2].set_xlabel(r'$\theta_1$', fontsize=45)
+    ax[1][2].set_ylabel('', rotation=0, fontsize=45)
+
+    cax = fig.add_axes([0.97, 0.343, 0.015, 0.3])  # Adjust these values to move the colorbar
+    cbar = fig.colorbar(hpd_diagn_plot, format='%1.2f', cax=cax)
+    standard_ticks = np.round(np.linspace(0, 100, num=6), 1)
+    all_ticks = np.unique(np.sort(np.append(standard_ticks[:-1], CONFIDENCE_LEVEL[0] * 100)))
+    tick_labels = [f"{label:.0f}\%" for label in all_ticks]
+    for i, label in enumerate(all_ticks):
+        if abs(label - CONFIDENCE_LEVEL[0]*100) <= 1e-6:
+            tick_labels[i] = r"$\mathbf{{{label}}}$\textbf{{\%}}".format(label=int(label))
+    cbar.ax.yaxis.set_ticks(all_ticks)
+    cbar.ax.set_yticklabels(tick_labels, fontsize=45)
+    cbar.ax.axhline(y=CONFIDENCE_LEVEL[0]*100, xmin=0, xmax=1, color="black", linestyle="--", linewidth=2.5)
+    cbar.ax.yaxis.set_ticks_position('left')
+    cbar.ax.yaxis.set_label_position('left')
+
+
+    fig.patches.append(patches.Rectangle((0.079, 0.503), 0.917, 0.395, transform=fig.transFigure, edgecolor='black', linewidth=2, facecolor="gainsboro", zorder=-1))
+    fig.patches.append(patches.Rectangle((0.079, 0.035), 0.917, 0.447, transform=fig.transFigure, edgecolor='black', linewidth=2, facecolor="gainsboro", zorder=-1))
+
+    line = mlines.Line2D(
+        [0.65, 0.65],   # x-coords (start, end)
+        [0.15, 0.85],               # y-coords (start, end)
+        transform=fig.transFigure,
+        ls='-',                  # dashed
+        lw=2.5,
+        color='black',
+        clip_on=False
+    )
+
+    fig.add_artist(line)
+
+    fig.add_artist(FancyArrowPatch(
+        posA=(0.239, 0.523), posB=(0.239, 0.455),
+        connectionstyle="arc3,rad=0", arrowstyle='-|>', mutation_scale=30, 
+        color='black', linewidth=6, zorder=10
+    ))
+    fig.add_artist(FancyArrowPatch(
+        posA=(0.513, 0.523), posB=(0.513, 0.455),
+        connectionstyle="arc3,rad=0", arrowstyle='-|>', mutation_scale=30, 
+        color='black', linewidth=6, zorder=10
+    ))
+    # fig.add_artist(FancyArrowPatch(
+    #     posA=(0.787, 0.523), posB=(0.787, 0.455),
+    #     connectionstyle="arc3,rad=0", arrowstyle='-|>', mutation_scale=30, 
+    #     color='black', linewidth=6, zorder=10
+    # ))
+
+    plt.savefig(f'{experiment_dir}/example0_horizontal.pdf', bbox_inches='tight')
+    plt.savefig(f'{experiment_dir}/example0_horizontal.png', bbox_inches='tight')
+    plt.close()
 
 if __name__ == "__main__":
     main()

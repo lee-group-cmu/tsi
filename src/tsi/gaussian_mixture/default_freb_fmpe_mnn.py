@@ -23,7 +23,7 @@ from lf2i.utils.other_methods import hpd_region
 from lf2i.plot.parameter_regions import plot_parameter_regions
 from lf2i.plot.coverage_diagnostics import coverage_probability_plot
 from lf2i.plot.power_diagnostics import set_size_plot
-from tsi.common.monotone_nn import train_monotonic_nn
+from tsi.common.monotone_nn import train_monotonic_nn, MonotonicNN
 from tsi.common.utils import create_experiment_hash, IntList, TrainingLogger
 from tsi.temp.utils import kdeplots2D
 
@@ -50,8 +50,7 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    # experiment_dir = f"results/fmpe/default_setting/{EXPERIMENT_ID}"
-    experiment_dir = 'results/fmpe/default_setting/20251105_133355_lr0.001_bs128_ep100_wd1e-05_gp0.0_dr0.0_0950301f'
+    experiment_dir = f"results/fmpe/default_setting/{EXPERIMENT_ID}"
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -103,6 +102,7 @@ def main(hidden_layers,
     try:
         with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'rb') as f:
             fmpe_posterior = dill.load(f)
+        print('FMPE loaded...')
     except:
         b_params = PRIOR.sample(sample_shape=(B, ))
         b_samples = simulator(b_params)
@@ -136,6 +136,7 @@ def main(hidden_layers,
     try:
         with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'rb') as f:
             lf2i = dill.load(f)
+        print('LF2I loaded...')
         with open(f"{experiment_dir}/input_bounds.pkl", 'rb') as f:
             input_bounds = dill.load(f)
 
@@ -147,6 +148,7 @@ def main(hidden_layers,
         )
         model.load_state_dict(torch.load(f"{experiment_dir}/best_monotonic_nn.pt", weights_only=True))
         model.eval()
+        print('MNN loaded...')
 
         lf2i.calibration_model = {
             'multiple_levels': model,
@@ -225,6 +227,7 @@ def main(hidden_layers,
     '''
 
     for idx_obs, _ in enumerate(obs_x):
+        print(f'Making draft sets for pt {idx_obs}...')
 
         if idx_obs <= 4:
             title = r'\textbf{a)} Prior poorly aligned with $\theta^{\star}$'
@@ -303,6 +306,7 @@ def main(hidden_layers,
         with open(f'{experiment_dir}/b_double_prime.pkl', 'rb') as f:
             b_double_prime = dill.load(f)
             b_double_prime_params, b_double_prime_samples = b_double_prime['params'], b_double_prime['samples']
+        print(f'Loaded diagnostics stuff...')
     except:
         b_double_prime_params = REFERENCE.sample(sample_shape=(B_DOUBLE_PRIME, ))
         b_double_prime_samples = simulator(b_double_prime_params)
@@ -371,6 +375,7 @@ def main(hidden_layers,
     fig, ax = plt.subplots(2, 3, figsize=(25, 16))
     fig.subplots_adjust(hspace=0.25)
 
+    print(f'Making final draft fig...')
     plot_parameter_regions(
         *credible_sets[1],
         param_dim=2,
