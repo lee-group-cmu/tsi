@@ -50,7 +50,7 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    experiment_dir = f"results/fmpe/{EXPERIMENT_ID}"
+    experiment_dir = f"results/fmpe/default_setting/{EXPERIMENT_ID}"
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -76,10 +76,10 @@ def main(hidden_layers,
         loc=torch.Tensor(PRIOR_LOC), covariance_matrix=PRIOR_VAR*torch.eye(n=POI_DIM)
     )
 
-    B = 100_000  # num simulations to estimate posterior and test statistics
-    B_PRIME = 50_000  # num simulations to estimate critical values
-    B_DOUBLE_PRIME = 30_000  # num simulations to do diagnostics
-    EVAL_GRID_SIZE = 50_000  # num evaluation points over parameter space to construct confidence sets
+    B = 50_000  # num simulations to estimate posterior and test statistics
+    B_PRIME = 30_000  # num simulations to estimate critical values
+    B_DOUBLE_PRIME = 10_000  # num simulations to do diagnostics
+    EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
     REFERENCE = BoxUniform(

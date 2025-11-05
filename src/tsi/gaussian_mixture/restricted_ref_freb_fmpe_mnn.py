@@ -50,7 +50,7 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    experiment_dir = f"results/{EXPERIMENT_ID}"
+    experiment_dir = f"results/fmpe/restricted_ref/{EXPERIMENT_ID}"
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -76,15 +76,14 @@ def main(hidden_layers,
         loc=torch.Tensor(PRIOR_LOC), covariance_matrix=PRIOR_VAR*torch.eye(n=POI_DIM)
     )
 
-    B = 100_000  # num simulations to estimate posterior and test statistics
-    B_PRIME = 50_000  # num simulations to estimate critical values
-    B_DOUBLE_PRIME = 30_000  # num simulations to do diagnostics
-    EVAL_GRID_SIZE = 50_000  # num evaluation points over parameter space to construct confidence sets
+    B = 50_000  # num simulations to estimate posterior and test statistics
+    B_PRIME = 30_000  # num simulations to estimate critical values
+    B_DOUBLE_PRIME = 10_000  # num simulations to do diagnostics
+    EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
-    REFERENCE = BoxUniform(
-        low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
-        high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
+    REFERENCE = MultivariateNormal(
+        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=2*PRIOR_VAR*torch.eye(n=POI_DIM)
     )
     # REFERENCE = PRIOR
     EVAL_GRID_DISTR = BoxUniform(
@@ -99,22 +98,21 @@ def main(hidden_layers,
     task = sbibm.get_task('gaussian_mixture')
     simulator = task.get_simulator()
     try:
-        with open(f'{experiment_dir}/snpe_strong_prior.pkl', 'rb') as f:
-            snpe_posterior = dill.load(f)
+        with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'rb') as f:
+            fmpe_posterior = dill.load(f)
     except:
         b_params = PRIOR.sample(sample_shape=(B, ))
         b_samples = simulator(b_params)
         b_params.shape, b_samples.shape
-        snpe = SNPE(
+        fmpe = FMPE(
             prior=PRIOR,
-            density_estimator='maf',
             device='cpu'
         )
 
-        _ = snpe.append_simulations(b_params, b_samples).train()
-        snpe_posterior = snpe.build_posterior()
-        with open(f'{experiment_dir}/snpe_strong_prior.pkl', 'wb') as f:
-            dill.dump(snpe_posterior, f)
+        _ = fmpe.append_simulations(b_params, b_samples).train()
+        fmpe_posterior = fmpe.build_posterior()
+        with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'wb') as f:
+            dill.dump(fmpe_posterior, f)
     b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
     b_prime_samples = simulator(b_prime_params)
     b_prime_params.shape, b_prime_samples.shape
@@ -132,7 +130,7 @@ def main(hidden_layers,
                 'obs_x': obs_x
             }, f)
 
-    lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=snpe_posterior,))
+    lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=fmpe_posterior,))
     logger = TrainingLogger(f'{experiment_dir}/logs')
     model, input_bounds = train_monotonic_nn(
         T_prime=(b_prime_params, b_prime_samples),
@@ -167,7 +165,7 @@ def main(hidden_layers,
             retrain_calibration=False
         )
     except:
-        lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=snpe_posterior, **POSTERIOR_KWARGS))
+        lf2i = LF2I(test_statistic=Posterior(poi_dim=2, estimator=fmpe_posterior, **POSTERIOR_KWARGS))
         confidence_sets = lf2i.inference(
             x=obs_x,
             evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
@@ -185,6 +183,8 @@ def main(hidden_layers,
         )
         with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'wb') as f:
             dill.dump(lf2i, f)
+        with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'wb') as f:
+            dill.dump(confidence_sets, f)
 
     remaining = len(obs_x)
     credible_sets = []
@@ -193,7 +193,7 @@ def main(hidden_layers,
         credible_sets_x = []
         for cl in CONFIDENCE_LEVEL:
             actual_cred_level, credible_set = hpd_region(
-                posterior=snpe_posterior,
+                posterior=fmpe_posterior,
                 param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
                 x=x.reshape(-1, ),
                 credible_level=cl,
@@ -204,6 +204,9 @@ def main(hidden_layers,
             credible_sets_x.append(credible_set)
         credible_sets.append(credible_sets_x)
         remaining -= 1
+    with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'wb') as f:
+        dill.dump(credible_sets, f)
+
     plt.rc('text', usetex=True)  # Enable LaTeX
     plt.rc('font', family='serif')  # Use a serif font (e.g., Computer Modern)
     plt.rcParams['text.latex.preamble'] = r'''
@@ -283,6 +286,70 @@ def main(hidden_layers,
             title='FreB with Posterior',
             custom_ax=None
         )
+
+    try:
+        with open(f'{experiment_dir}/diagn_confset_strong_prior.pkl', 'rb') as f:
+            diagn_objects = dill.load(f)
+        with open(f'{experiment_dir}/diagn_cred_strong_prior.pkl', 'rb') as f:
+            diagn_objects_cred = dill.load(f)
+        with open(f'{experiment_dir}/b_double_prime.pkl', 'rb') as f:
+            b_double_prime = dill.load(f)
+            b_double_prime_params, b_double_prime_samples = b_double_prime['params'], b_double_prime['samples']
+    except:
+        b_double_prime_params = REFERENCE.sample(sample_shape=(B_DOUBLE_PRIME, ))
+        b_double_prime_samples = simulator(b_double_prime_params)
+        b_double_prime_params.shape, b_double_prime_samples.shape
+        with open(f'{experiment_dir}/b_double_prime.pkl', 'wb') as f:
+            dill.dump({
+                'params': b_double_prime_params,
+                'samples': b_double_prime_samples
+            }, f)
+
+        diagn_objects = {}
+        for cl in CONFIDENCE_LEVEL[:1]:  # 0.954
+            print(cl, flush=True)
+            diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2i.diagnostics(
+                region_type='lf2i',
+                confidence_level=cl,
+                calibration_method='critical-values',
+                coverage_estimator='splines',
+                T_double_prime=(b_double_prime_params, b_double_prime_samples),
+            )
+            diagn_objects[cl] = (diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset)
+        with open(f'{experiment_dir}/diagn_confset_strong_prior.pkl', 'wb') as f:
+            dill.dump(diagn_objects, f)
+
+        plt.scatter(out_parameters_confset[:, 0], out_parameters_confset[:, 1], c=mean_proba_confset)
+        plt.title('Coverage of FreB confidence sets')
+        plt.clim(vmin=0, vmax=1)
+        plt.colorbar()
+        plt.savefig(f'{experiment_dir}/freb_coverage')
+        plt.close()
+
+        diagn_objects_cred = {}
+        size_grid_for_sizes = 5_000
+        for cl in CONFIDENCE_LEVEL[:1]:  # 0.954
+            print(cl, flush=True)
+            diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes = lf2i.diagnostics(
+                region_type='posterior',
+                confidence_level=cl,
+                coverage_estimator='splines',
+                T_double_prime=(b_double_prime_params, b_double_prime_samples),
+                posterior_estimator=lf2i.test_statistic.estimator,
+                evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
+                num_level_sets=5_000,
+                **POSTERIOR_KWARGS
+            )
+            diagn_objects_cred[cl] = (diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes)
+        with open(f'{experiment_dir}/diagn_cred_strong_prior.pkl', 'wb') as f:
+            dill.dump(diagn_objects_cred, f)
+
+        plt.scatter(out_parameters_credible[:, 0], out_parameters_credible[:, 1], c=mean_proba_credible)
+        plt.title('Coverage of credible regions')
+        plt.clim(vmin=0, vmax=1)
+        plt.colorbar()
+        plt.savefig(f'{experiment_dir}/hpd_coverage')
+        plt.close()
 
 if __name__ == "__main__":
     main()
