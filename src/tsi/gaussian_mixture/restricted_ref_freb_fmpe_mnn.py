@@ -50,7 +50,8 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    experiment_dir = f"results/fmpe/restricted_ref/{EXPERIMENT_ID}"
+    # experiment_dir = f"results/fmpe/restricted_ref/{EXPERIMENT_ID}"
+    experiment_dir = 'results/fmpe/restricted_ref/20251106_222516_lr0.001_bs128_ep100_wd1e-05_gp0.0_dr0.0_0950301f'
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -83,9 +84,12 @@ def main(hidden_layers,
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
     REFERENCE = MultivariateNormal(
-        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=2*PRIOR_VAR*torch.eye(n=POI_DIM)
+        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=3*PRIOR_VAR*torch.eye(n=POI_DIM)
     )
-    # REFERENCE = PRIOR
+    REFERENCE_DIAGNOSTICS = BoxUniform(
+        low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
+        high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
+    )
     EVAL_GRID_DISTR = BoxUniform(
         low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0], POI_BOUNDS[r'$\theta_2$'][0])),
         high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1], POI_BOUNDS[r'$\theta_2$'][1]))
@@ -135,61 +139,78 @@ def main(hidden_layers,
     try:
         with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'rb') as f:
             lf2i = dill.load(f)
+        with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'rb') as f:
+            confidence_sets = dill.load(f)
         print('LF2I loaded...')
-        with open(f"{experiment_dir}/input_bounds.pkl", 'rb') as f:
-            input_bounds = dill.load(f)
+        # with open(f"{experiment_dir}/input_bounds.pkl", 'rb') as f:
+        #     input_bounds = dill.load(f)
 
-        model = MonotonicNN(
-            in_d=POI_DIM + 1,
-            hidden_layers=FREB_KWARGS['hidden_layers'],
-            sigmoid=True,
-            input_bounds=input_bounds
-        )
-        model.load_state_dict(torch.load(f"{experiment_dir}/best_monotonic_nn.pt", weights_only=True))
-        model.eval()
-        print('MNN loaded...')
+        # model = MonotonicNN(
+        #     in_d=POI_DIM + 1,
+        #     hidden_layers=FREB_KWARGS['hidden_layers'],
+        #     sigmoid=True,
+        #     input_bounds=input_bounds
+        # )
+        # model.load_state_dict(torch.load(f"{experiment_dir}/best_monotonic_nn.pt", weights_only=True))
+        # model.eval()
+        # print('MNN loaded...')
 
-        lf2i.calibration_model = {
-            'multiple_levels': model,
-        }
+        # lf2i.calibration_model = {
+        #     'multiple_levels': model,
+        # }
     except Exception as e:
         print(e)
 
-        lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=fmpe_posterior,))
-        logger = TrainingLogger(f'{experiment_dir}/logs')
-        model, input_bounds = train_monotonic_nn(
-            T_prime=(b_prime_params, b_prime_samples),
-            test_statistic=lf2i.test_statistic,
-            config=FREB_KWARGS,
-            logger=logger
-        )
-        with open(f'{experiment_dir}/input_bounds.pkl', 'wb') as f:
-            dill.dump(input_bounds, f)
-
-        logger.save_losses()
-        logger.save_losses_csv()
-        logger.plot_training_curves()
-        logger.print_summary()
-
-        with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'wb') as f:
-            dill.dump(lf2i, f)
-        lf2i.calibration_model = {
-            'multiple_levels': model,
-        }
-
-    try:
-        with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'rb') as f:
-            confidence_sets = dill.load(f)
-    except:
+        lf2i = LF2I(test_statistic=Posterior(poi_dim=POI_DIM, estimator=fmpe_posterior, n_jobs=1))
         confidence_sets = lf2i.inference(
             x=obs_x,
             evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
             confidence_level=CONFIDENCE_LEVEL,
-            calibration_method='p-values',
+            calibration_method='critical-values',
+            calibration_model='cat-gb',
+            calibration_model_kwargs={
+                'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
+                'n_iter': 25
+            },
+            T_prime=(b_prime_params, b_prime_samples),
             retrain_calibration=False
         )
+        # logger = TrainingLogger(f'{experiment_dir}/logs')
+        # model, input_bounds = train_monotonic_nn(
+        #     T_prime=(b_prime_params, b_prime_samples),
+        #     test_statistic=lf2i.test_statistic,
+        #     config=FREB_KWARGS,
+        #     logger=logger
+        # )
+        # with open(f'{experiment_dir}/input_bounds.pkl', 'wb') as f:
+        #     dill.dump(input_bounds, f)
+
+        # logger.save_losses()
+        # logger.save_losses_csv()
+        # logger.plot_training_curves()
+        # logger.print_summary()
+
+        with open(f'{experiment_dir}/lf2i_strong_prior.pkl', 'wb') as f:
+            dill.dump(lf2i, f)
         with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'wb') as f:
             dill.dump(confidence_sets, f)
+        # lf2i.calibration_model = {
+        #     'multiple_levels': model,
+        # }
+
+    # try:
+    #     with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'rb') as f:
+    #         confidence_sets = dill.load(f)
+    # except:
+    #     confidence_sets = lf2i.inference(
+    #         x=obs_x,
+    #         evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
+    #         confidence_level=CONFIDENCE_LEVEL,
+    #         calibration_method='p-values',
+    #         retrain_calibration=False
+    #     )
+    #     with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'wb') as f:
+    #         dill.dump(confidence_sets, f)
 
     try:
         with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'rb') as f:
@@ -307,7 +328,7 @@ def main(hidden_layers,
             b_double_prime_params, b_double_prime_samples = b_double_prime['params'], b_double_prime['samples']
         print(f'Loaded diagnostics stuff...')
     except:
-        b_double_prime_params = REFERENCE.sample(sample_shape=(B_DOUBLE_PRIME, ))
+        b_double_prime_params = REFERENCE_DIAGNOSTICS.sample(sample_shape=(B_DOUBLE_PRIME, ))
         b_double_prime_samples = simulator(b_double_prime_params)
         b_double_prime_params.shape, b_double_prime_samples.shape
         with open(f'{experiment_dir}/b_double_prime.pkl', 'wb') as f:
@@ -322,8 +343,9 @@ def main(hidden_layers,
             diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2i.diagnostics(
                 region_type='lf2i',
                 confidence_level=cl,
-                calibration_method='p-values',
-                coverage_estimator='splines',
+                # calibration_method='p-values',
+                calibration_method='critical-values',
+                coverage_estimator='cat-gb',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
             )
             diagn_objects[cl] = (diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset)
@@ -344,7 +366,7 @@ def main(hidden_layers,
             diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes = lf2i.diagnostics(
                 region_type='posterior',
                 confidence_level=cl,
-                coverage_estimator='splines',
+                coverage_estimator='cat-gb',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
                 posterior_estimator=lf2i.test_statistic.estimator,
                 evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),

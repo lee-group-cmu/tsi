@@ -51,6 +51,7 @@ def main(hidden_layers,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
     experiment_dir = f"results/fmpe/default_setting/{EXPERIMENT_ID}"
+    # experiment_dir = 'results/fmpe/default_setting/20251106_173245_lr0.001_bs128_ep100_wd1e-05_gp0.0_dr0.0_0950301f'
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -76,7 +77,7 @@ def main(hidden_layers,
         loc=torch.Tensor(PRIOR_LOC), covariance_matrix=PRIOR_VAR*torch.eye(n=POI_DIM)
     )
 
-    B = 50_000  # num simulations to estimate posterior and test statistics
+    B = 100_000  # num simulations to estimate posterior and test statistics
     B_PRIME = 30_000  # num simulations to estimate critical values
     B_DOUBLE_PRIME = 10_000  # num simulations to do diagnostics
     EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
@@ -116,6 +117,7 @@ def main(hidden_layers,
         _ = fmpe.append_simulations(b_params, b_samples).train()
         fmpe_posterior = fmpe.build_posterior()
         with open('results/fmpe/fmpe_strong_prior.pkl', 'wb') as f:
+        # with open(f'{experiment_dir}/fmpe_strong_prior.pkl', 'wb') as f:
             dill.dump(fmpe_posterior, f)
     b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
     b_prime_samples = simulator(b_prime_params)
@@ -325,7 +327,7 @@ def main(hidden_layers,
                 region_type='lf2i',
                 confidence_level=cl,
                 calibration_method='p-values',
-                coverage_estimator='splines',
+                coverage_estimator='cat-gb',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
             )
             diagn_objects[cl] = (diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset)
@@ -346,7 +348,7 @@ def main(hidden_layers,
             diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes = lf2i.diagnostics(
                 region_type='posterior',
                 confidence_level=cl,
-                coverage_estimator='splines',
+                coverage_estimator='cat-gb',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
                 posterior_estimator=lf2i.test_statistic.estimator,
                 evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),

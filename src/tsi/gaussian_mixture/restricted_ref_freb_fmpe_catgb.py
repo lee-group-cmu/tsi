@@ -14,7 +14,6 @@ from torch.distributions import MultivariateNormal
 from sbi.inference import FMPE, SNPE, NPSE
 from sbi.analysis import pairplot
 from sbi.utils import BoxUniform
-from sbi.simulators.gaussian_mixture import gaussian_mixture
 import sbibm
 from lf2i.inference import LF2I
 from lf2i.test_statistics.posterior import Posterior
@@ -51,8 +50,8 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    # experiment_dir = f"results/fmpe/concept_shift/{EXPERIMENT_ID}"
-    experiment_dir = 'results/fmpe/concept_shift/20251106_190857_lr0.001_bs128_ep100_wd1e-05_gp0.0_dr0.0_0950301f'
+    # experiment_dir = f"results/fmpe/restricted_ref/{EXPERIMENT_ID}"
+    experiment_dir = 'results/fmpe/restricted_ref/20251106_224418_lr0.001_bs128_ep100_wd1e-05_gp0.0_dr0.0_0950301f'
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -84,9 +83,8 @@ def main(hidden_layers,
     EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
-    REFERENCE = BoxUniform(
-        low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
-        high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
+    REFERENCE = MultivariateNormal(
+        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=3*PRIOR_VAR*torch.eye(n=POI_DIM)
     )
     # REFERENCE = PRIOR
     EVAL_GRID_DISTR = BoxUniform(
@@ -100,19 +98,14 @@ def main(hidden_layers,
     DEVICE = 'cpu'
     task = sbibm.get_task('gaussian_mixture')
     simulator = task.get_simulator()
-    SIM_PARAMS = {
-        "mixture_locs_factor": [0.75, 0.75],
-        "mixture_scales": [1.0, 0.1],
-        "mixture_weights": [0.5, 0.5],
-    }
-    train_simulator = lambda theta: gaussian_mixture(theta, mixture_locs_factor=SIM_PARAMS['mixture_locs_factor'])
 
     try:
-        with open(f'{experiment_dir}/fmpe_concept_shift.pkl', 'rb') as f:
+        with open('results/fmpe/fmpe_strong_prior.pkl', 'rb') as f:
             fmpe_posterior = dill.load(f)
+        print('FMPE loaded...')
     except:
         b_params = PRIOR.sample(sample_shape=(B, ))
-        b_samples = train_simulator(b_params)
+        b_samples = simulator(b_params)
         b_params.shape, b_samples.shape
         fmpe = FMPE(
             prior=PRIOR,
@@ -121,7 +114,7 @@ def main(hidden_layers,
 
         _ = fmpe.append_simulations(b_params, b_samples).train()
         fmpe_posterior = fmpe.build_posterior()
-        with open(f'{experiment_dir}/fmpe_concept_shift.pkl', 'wb') as f:
+        with open('results/fmpe/fmpe_strong_prior.pkl', 'wb') as f:
             dill.dump(fmpe_posterior, f)
     b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
     b_prime_samples = simulator(b_prime_params)
@@ -170,7 +163,8 @@ def main(hidden_layers,
             x=obs_x,
             evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
             confidence_level=CONFIDENCE_LEVEL,
-            calibration_method='critical-values',
+            # calibration_method='critical-values',
+            calibration_method='p-values',
             calibration_model='cat-gb',
             calibration_model_kwargs={
                 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
@@ -347,8 +341,8 @@ def main(hidden_layers,
             diagnostics_estimator_confset, out_parameters_confset, mean_proba_confset, upper_proba_confset, lower_proba_confset = lf2i.diagnostics(
                 region_type='lf2i',
                 confidence_level=cl,
-                # calibration_method='p-values',
-                calibration_method='critical-values',
+                calibration_method='p-values',
+                # calibration_method='critical-values',
                 coverage_estimator='cat-gb',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
             )
