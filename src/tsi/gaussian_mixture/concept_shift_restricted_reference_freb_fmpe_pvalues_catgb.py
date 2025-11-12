@@ -52,7 +52,7 @@ def main(hidden_layers,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
     # experiment_dir = f"results/fmpe/concept_shift_and_restricted_reference/{EXPERIMENT_ID}"
-    experiment_dir = 'results/fmpe/concept_shift_and_restricted_reference/critical_values_catgb'
+    experiment_dir = 'results/fmpe/concept_shift_and_restricted_reference/p_values_catgb'
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -173,7 +173,7 @@ def main(hidden_layers,
             x=obs_x,
             evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
             confidence_level=CONFIDENCE_LEVEL,
-            calibration_method='critical-values',
+            calibration_method='p-values',
             calibration_model='cat-gb',
             calibration_model_kwargs={
                 'cv': {'iterations': [100, 300, 500, 700, 1000], 'depth': [1, 3, 5, 7, 9]},
@@ -351,7 +351,7 @@ def main(hidden_layers,
                 region_type='lf2i',
                 confidence_level=cl,
                 # calibration_method='p-values',
-                calibration_method='critical-values',
+                calibration_method='p-values',
                 coverage_estimator='cat-gb',
                 T_double_prime=(b_double_prime_params, b_double_prime_samples),
             )

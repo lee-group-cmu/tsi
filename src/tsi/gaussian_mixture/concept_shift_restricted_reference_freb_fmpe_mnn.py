@@ -52,7 +52,7 @@ def main(hidden_layers,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
     # experiment_dir = f"results/fmpe/concept_shift_and_restricted_reference/{EXPERIMENT_ID}"
-    experiment_dir = 'results/fmpe/concept_shift_and_restricted_reference/p_values_mnn'
+    experiment_dir = 'results/fmpe/concept_shift_and_restricted_reference/p_values_mnn_bprime50_000'
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -79,7 +79,7 @@ def main(hidden_layers,
     )
 
     B = 50_000  # num simulations to estimate posterior and test statistics
-    B_PRIME = 30_000  # num simulations to estimate critical values
+    B_PRIME = 50_000  # num simulations to estimate critical values
     B_DOUBLE_PRIME = 10_000  # num simulations to do diagnostics
     EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
