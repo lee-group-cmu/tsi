@@ -51,8 +51,8 @@ def main(hidden_layers,
          lambda_gp,
          dropout_rate):
     EXPERIMENT_ID = create_experiment_hash(locals())
-    # experiment_dir = f"results/fmpe/concept_shift_and_restricted_reference/{EXPERIMENT_ID}"
-    experiment_dir = 'results/fmpe/concept_shift_and_restricted_reference/p_values_mnn_bprime50_000'
+    asset_dir = 'results/concept_shift/gaussian_reference/posterior_fmpe/p_values_mnn'
+    experiment_dir = f'results/concept_shift/gaussian_reference/posterior_fmpe/p_values_mnn/{EXPERIMENT_ID}'
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     FREB_KWARGS = {
@@ -111,7 +111,7 @@ def main(hidden_layers,
     train_simulator = lambda theta: gaussian_mixture(theta, mixture_locs_factor=SIM_PARAMS['mixture_locs_factor'])
 
     try:
-        with open(f'{experiment_dir}/fmpe_concept_shift.pkl', 'rb') as f:
+        with open(f'{asset_dir}/fmpe_concept_shift.pkl', 'rb') as f:
             fmpe_posterior = dill.load(f)
     except:
         b_params = PRIOR.sample(sample_shape=(B, ))
@@ -124,20 +124,20 @@ def main(hidden_layers,
 
         _ = fmpe.append_simulations(b_params, b_samples).train()
         fmpe_posterior = fmpe.build_posterior()
-        with open(f'{experiment_dir}/fmpe_concept_shift.pkl', 'wb') as f:
+        with open(f'{asset_dir}/fmpe_concept_shift.pkl', 'wb') as f:
             dill.dump(fmpe_posterior, f)
     b_prime_params = REFERENCE.sample(sample_shape=(B_PRIME, ))
     b_prime_samples = simulator(b_prime_params)
     b_prime_params.shape, b_prime_samples.shape
     try:
-        with open(f'{experiment_dir}/obs_x_theta.pkl', 'rb') as f:
+        with open(f'{asset_dir}/obs_x_theta.pkl', 'rb') as f:
             examples = dill.load(f)
             true_theta = examples['true_theta']
             obs_x = examples['obs_x']
     except:
         true_theta = torch.Tensor([[-8.5, -8.5], [-8.5, 8.5], [8.5, -8.5], [8.5, 8.5], [-3.5, -3.5], [-3.5, 3.5], [3.5, -3.5], [3.5, 3.5], [0., 0.], [0., 0.], [0., 0.], [0., 0.]])
         obs_x = simulator(true_theta)
-        with open(f'{experiment_dir}/obs_x_theta.pkl', 'wb') as f:
+        with open(f'{asset_dir}/obs_x_theta.pkl', 'wb') as f:
             dill.dump({
                 'true_theta': true_theta,
                 'obs_x': obs_x
@@ -228,7 +228,7 @@ def main(hidden_layers,
     #         dill.dump(confidence_sets, f)
 
     try:
-        with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'rb') as f:
+        with open(f'{asset_dir}/credible_sets_strong_prior.pkl', 'rb') as f:
             credible_sets = dill.load(f)
     except:
         remaining = len(obs_x)
@@ -249,7 +249,7 @@ def main(hidden_layers,
                 credible_sets_x.append(credible_set)
             credible_sets.append(credible_sets_x)
             remaining -= 1
-        with open(f'{experiment_dir}/credible_sets_strong_prior.pkl', 'wb') as f:
+        with open(f'{asset_dir}/credible_sets_strong_prior.pkl', 'wb') as f:
             dill.dump(credible_sets, f)
 
     plt.rc('text', usetex=True)  # Enable LaTeX
@@ -336,7 +336,7 @@ def main(hidden_layers,
     try:
         with open(f'{experiment_dir}/diagn_confset_strong_prior.pkl', 'rb') as f:
             diagn_objects = dill.load(f)
-        with open(f'{experiment_dir}/diagn_cred_strong_prior.pkl', 'rb') as f:
+        with open(f'{asset_dir}/diagn_cred_strong_prior.pkl', 'rb') as f:
             diagn_objects_cred = dill.load(f)
         with open(f'{experiment_dir}/b_double_prime.pkl', 'rb') as f:
             b_double_prime = dill.load(f)
@@ -389,7 +389,7 @@ def main(hidden_layers,
                 **POSTERIOR_KWARGS
             )
             diagn_objects_cred[cl] = (diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes)
-        with open(f'{experiment_dir}/diagn_cred_strong_prior.pkl', 'wb') as f:
+        with open(f'{asset_dir}/diagn_cred_strong_prior.pkl', 'wb') as f:
             dill.dump(diagn_objects_cred, f)
 
         plt.scatter(out_parameters_credible[:, 0], out_parameters_credible[:, 1], c=mean_proba_credible)
