@@ -1,7 +1,8 @@
 ---
 layout: default
-title: Supplement on Waldo vs. FreB
 ---
+
+# Supplement on Waldo vs FreB
 
 We provide an empirical demonstration of the implication of Theorem 6 — that the confidence sets produced by the FreB framework are, **on average over the target population**, the smallest among all locally valid confidence procedures. To emphasize this point, we compare FreB with another likelihood-free confidence procedure, **Waldo** [cite], on the classic *Two Moons* task.
 
@@ -20,29 +21,29 @@ r~\sin(\alpha)
 \end{pmatrix},
 $$
 
-with $\alpha\sim\mathcal{U}(-\pi/2,\pi/2)$ and $r\sim\mathcal{N}(0.1,0.01^2)$.
+with $$\alpha\sim\mathcal{U}(-\pi/2,\pi/2)$$ and $$r\sim\mathcal{N}(0.1,0.01^2)$$.
 
 We study the comparative performance of **Waldo** and **FreB** under two priors:
 
-1. a uniform prior on $\Theta=[-1,1]^2$, and
+1. a uniform prior on $$\Theta=[-1,1]^2$$, and
 2. a strong Gaussian prior.
 
 In each case, we use a flow-matching posterior estimator from the **SBI** library, using default hyperparameters. We generate one observation from each mode of the likelihood:
 
-* $X_{1,\text{target}} \sim p(X\mid\theta^\star = [-0.5,-0.5])$
-* $X_{2,\text{target}} \sim p(X\mid\theta^\star = [0.5,0.5])$
+* $$X_{1,\text{target}} \sim p(X\mid\theta^\star = [-0.5,-0.5])$$
+* $$X_{2,\text{target}} \sim p(X\mid\theta^\star = [0.5,0.5])$$
 
-As in our other examples, we assume only a single sample to infer $\theta^\star$, i.e., $n=1$.
+As in our other examples, we assume only a single sample to infer $$\theta^\star$$, i.e., $$n=1$$.
 
 **Experimental setup (common across prior settings):**
 
-1. **Training set:**   Construct $T_{tr} = \{(\theta_i, X_i)\}_{i=1}^B \sim p(X\vert\theta)\pi(\theta)$ with $B=50{,}000$ and $\pi(\theta)=\mathcal{N}([0.5,0.5]^T, 0.5I)$ to learn $\hat{\pi}(\theta\mid X)$ via flow matching.
+1. **Training set:**   Construct $$T_{tr} = \{(\theta_i, X_i)\}_{i=1}^B \sim p(X\vert\theta)\pi(\theta)$$ with $$B=50{,}000$$ and $$\pi(\theta)=\mathcal{N}([0.5,0.5]^T, 0.5I)$$ to learn $$\hat{\pi}(\theta\mid X)$$ via flow matching.
 
 2. **Calibration set:**
-   Construct $T_{calib} = \{(\theta_i, X_i)\}_{i=1}^{B'} \sim p(X\vert\theta) r(\theta)$ with $B'=50{,}000$ and $r(\theta)=\mathcal{U}([-1,1]^2)$, and estimate critical values via quantile regression using **CatBoost**.
+   Construct $$T_{calib} = \{(\theta_i, X_i)\}_{i=1}^{B'} \sim p(X\vert\theta) r(\theta)$$ with $$B'=50{,}000$$ and $$r(\theta)=\mathcal{U}([-1,1]^2)$$, and estimate critical values via quantile regression using **CatBoost**.
 
 3. **Diagnostic set / local size estimation:**
-   Construct $T_{diagn} = \{(\theta_i, X_i)\}_{i=1}^{B''} \sim p(X\vert\theta) r(\theta)$, with $B''=10{,}000$ and $r(\theta)=\mathcal{U}([-1,1]^2)$. A probabilistic classifier is then trained using CatBoost to estimate local set size.
+   Construct $$T_{diagn} = \{(\theta_i, X_i)\}_{i=1}^{B''} \sim p(X\vert\theta) r(\theta)$$, with $$B''=10{,}000$$ and $$r(\theta)=\mathcal{U}([-1,1]^2)$$. A probabilistic classifier is then trained using CatBoost to estimate local set size.
 
 ---
 
