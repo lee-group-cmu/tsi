@@ -1,4 +1,7 @@
-# Synthetic example: Two Moons benchmark
+---
+layout: default
+title: Supplement on Waldo vs. FreB
+---
 
 We provide an empirical demonstration of the implication of Theorem 6 — that the confidence sets produced by the FreB framework are, **on average over the target population**, the smallest among all locally valid confidence procedures. To emphasize this point, we compare FreB with another likelihood-free confidence procedure, **Waldo** [cite], on the classic *Two Moons* task.
 
@@ -47,7 +50,7 @@ As in our other examples, we assume only a single sample to infer $\theta^\star$
 
 Figure 1 shows results under the uniform prior. The primary factor influencing the size of **Waldo**’s confidence sets is their dependence on the posterior variance. Because the posterior is bimodal, this variance is globally large, even though each mode is individually sharp. FreB, on the other hand, preserves the posterior multimodality while maintaining valid coverage on each mode without merging them.
 
-![FreB vs Waldo with uniform prior](docs/assets/freb_v_waldo_uniform_prior.png)
+![FreB vs Waldo with uniform prior](figures/freb_v_waldo_uniform_prior.png)
 
 **Figure 1 — FreB confidence sets are precise (uniform prior).**
 With the two-moons task, FreB yields substantially more precise confidence sets than **Waldo**, which tends to merge the two modes and become conservative as a result.
@@ -58,7 +61,9 @@ With the two-moons task, FreB yields substantially more precise confidence sets 
 
 Figure 2 displays results under the strong prior. Both FreB and Waldo maintain local coverage despite being trained under a strongly informative prior. In this case, Waldo’s confidence sets can also be multimodal (see Panel a), but they are less constrained beyond the prior support than FreB's. This behavior may arise because Waldo’s test statistic depends more heavily on the posterior estimator’s variance than the posterior density itself.
 
-![FreB vs Waldo with strong prior](docs/assets/freb_v_waldo_strong_prior.png)
+![FreB vs Waldo with strong prior](figures/freb_v_waldo_strong_prior.png)
 
 **Figure 2 — FreB confidence sets are precise (strong prior).**
 Under the strong prior, FreB again provides tighter confidence sets than Waldo.
+ 
+---
