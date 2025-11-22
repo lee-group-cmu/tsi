@@ -30,8 +30,10 @@ We study the comparative performance of **Waldo** and **FreB** under two priors:
 
 In each case, we use a flow-matching posterior estimator from the **SBI** library, using default hyperparameters. We generate one observation from each mode of the likelihood:
 
-* $$X_{1,\text{target}} \sim p(X\mid\theta^\star = [-0.5,-0.5])$$
-* $$X_{2,\text{target}} \sim p(X\mid\theta^\star = [0.5,0.5])$$
+$$
+X_{1,\text{target}} \sim p(X\mid\theta^\star = [-0.5,-0.5]) \\
+X_{2,\text{target}} \sim p(X\mid\theta^\star = [0.5,0.5])
+$$
 
 As in our other examples, we assume only a single sample to infer $$\theta^\star$$, i.e., $$n=1$$.
 

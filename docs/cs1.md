@@ -22,30 +22,30 @@ High-energy gamma rays must be discriminated from the much more abundant charged
 
 ## Data
 
-Our data set consists of a large number of labeled gamma-ray events $(E_i, Z_i, A_i, X_i)$. For each event $i$:
+Our data set consists of a large number of labeled gamma-ray events $$(E_i, Z_i, A_i, X_i)$$. For each event $$i$$:
 
-1. $E_i$ is the energy of the original gamma ray in GeV
-2. $Z_i$ is the zenith/polar angle
-3. $A_i$ is the azimuthal angle
-4. $X_i$ represents the data collected by ground detectors by the resulting atmospheric shower
+1. $$E_i$$ is the energy of the original gamma ray in GeV
+2. $$Z_i$$ is the zenith/polar angle
+3. $$A_i$$ is the azimuthal angle
+4. $$X_i$$ represents the data collected by ground detectors by the resulting atmospheric shower
 
 Our data come from the CORSIKA simulator. We make three splits from the data:
 
-1. **Training set** ($B=1{,}072{,}821$) used to train our posterior estimator $p(\theta_i \mid X_i)$
-2. **Calibration set** ($B'=98{,}765$) used to train our FreB quantile regression
-3. **Diagnostic set** ($B''=42{,}270$) used to evaluate the performance of our confidence set procedures
+1. **Training set** ($$B=1{,}072{,}821$$) used to train our posterior estimator $$p(\theta_i \mid X_i)$$
+2. **Calibration set** ($$B'=98{,}765$$) used to train our FreB quantile regression
+3. **Diagnostic set** ($$B''=42{,}270$$) used to evaluate the performance of our confidence set procedures
 
-For observed detector data $X_i$, we assume (an unrealistic, but practical for this work) full ground coverage in a 4km × 4km square, where each detector is 2m × 2m. For a given shower, we assume that each detector is capable of recording the identity and timing of every secondary particle that passes through it. The number of secondary particles per shower can range from less than 10 for low-energy gamma rays to up to 100 million for very high-energy gamma rays. Although many types of secondary particles may appear in an atmospheric shower, we consider only two broad groups (photons/electrons/positrons versus everything else) for ease of analysis.
+For observed detector data $$X_i$$, we assume (an unrealistic, but practical for this work) full ground coverage in a 4km × 4km square, where each detector is 2m × 2m. For a given shower, we assume that each detector is capable of recording the identity and timing of every secondary particle that passes through it. The number of secondary particles per shower can range from less than 10 for low-energy gamma rays to up to 100 million for very high-energy gamma rays. Although many types of secondary particles may appear in an atmospheric shower, we consider only two broad groups (photons/electrons/positrons versus everything else) for ease of analysis.
 
-We remove all gamma-ray events in all data splits where less than 10 ground detectors recorded secondary particle hits. We weight our filtered training data to resemble the Crab Nebula in terms of its energy spectrum. We also weight the training data to resemble a fixed reference distribution in zenith. This reference distribution is a combination of a uniform distribution over the sphere and atmospheric effects at high zenith angles. We assume that $p(X_i \mid \theta_i)$ exhibits azimuthal symmetry.
+We remove all gamma-ray events in all data splits where less than 10 ground detectors recorded secondary particle hits. We weight our filtered training data to resemble the Crab Nebula in terms of its energy spectrum. We also weight the training data to resemble a fixed reference distribution in zenith. This reference distribution is a combination of a uniform distribution over the sphere and atmospheric effects at high zenith angles. We assume that $$p(X_i \mid \theta_i)$$ exhibits azimuthal symmetry.
 
 We place our observer at 19 degrees north for definitiveness. This latitude corresponds to the current location of the operational HAWC observatory.
 
 ## Details on Training
 
-We train our posterior estimator using a the flow matching architecture, a diffusion-based model with training-based acceleration, to obtain an estimate of the posterior $\hat p(\theta_i \mid X_i)$. We use the `SBI` Python package v0.23.2 to implement the flow matching model. We use the default model architecture in `SBI`, but use a custom context model to convert our high-dimensional $X_i$ into a low-dimensional context vector:
+We train our posterior estimator using a the flow matching architecture, a diffusion-based model with training-based acceleration, to obtain an estimate of the posterior $$\hat p(\theta_i \mid X_i)$$. We use the `SBI` Python package v0.23.2 to implement the flow matching model. We use the default model architecture in `SBI`, but use a custom context model to convert our high-dimensional $$X_i$$ into a low-dimensional context vector:
 
-1. $X_i$ has initial shape 3×2000×2000
+1. $$X_i$$ has initial shape 3×2000×2000
 2. Max pooling for timing channel and Average pooling for counts channels with kernel size/stride of 20
 3. 2D Convolution with max pooling and batch normalization
 4. 2D Convolution with max pooling and batch normalization
