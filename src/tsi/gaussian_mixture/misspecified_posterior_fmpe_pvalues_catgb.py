@@ -32,101 +32,14 @@ from sklearn.base import BaseEstimator, ClassifierMixin
 from pygam import LogisticGAM, s, te, l, f
 import numpy as np
 
-class GAMWrapper(BaseEstimator, ClassifierMixin):
-    def __init__(self, add_radius=True):
-        """
-        add_radius: If True, expects X of shape (N, 3) and adds radius as 4th column
-                    If False, expects X of shape (N, 4) with radius already included
-        """
-        self.add_radius = add_radius
-        self.classes_ = np.array([0, 1])
-
-    def _add_radius_feature(self, X):
-        """Add radius as ||theta|| = sqrt(X[:, 1]^2 + X[:, 2]^2)"""
-        if not self.add_radius:
-            return X
-        
-        if X.shape[1] != 3:
-            raise ValueError(f"Expected X with 3 columns when add_radius=True, got {X.shape[1]}")
-        
-        radius = np.linalg.norm(X[:, [1, 2]], axis=1, keepdims=True)
-        return np.column_stack([X, radius])
-
-    def _build_formula(self):
-        """Reconstruct the formula from config"""
-        formula = (
-            s(0, constraints='monotonic_inc', n_splines=12, spline_order=3) +
-            l(3) +
-            te(0, 3, n_splines=3, spline_order=2) +
-            s(3, constraints='concave', n_splines=6, spline_order=2)
-        )
-        return formula
-
-    def fit(self, X, y):
-        """
-        Fit the GAM model.
-        
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, 3)
-            Features [t, theta1, theta2]
-        y : array-like of shape (n_samples,)
-            Target values
-        """
-        # Add radius feature
-        X_with_radius = self._add_radius_feature(X)
-        
-        # Reconstruct the formula inside fit (after cloning)
-        self.gam_model_ = LogisticGAM(self._build_formula(), tol=1e-4)
-        self.gam_model_.gridsearch(
-            X_with_radius,
-            y,
-            lam=np.logspace(-1, 3, 9),
-            progress=False
-        )
-        return self
-    
-    def predict(self, X):
-        """
-        Predict class labels.
-        
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, 3)
-            Features [t, theta1, theta2]
-        
-        Returns
-        -------
-        array of shape (n_samples,)
-            Predicted class labels
-        """
-        X_with_radius = self._add_radius_feature(X)
-        return self.gam_model_.predict(X_with_radius)
-    
-    def predict_proba(self, X):
-        """
-        Predict class probabilities.
-        
-        Parameters
-        ----------
-        X : array-like of shape (n_samples, 3)
-            Features [t, theta1, theta2]
-        
-        Returns
-        -------
-        array of shape (n_samples, 2)
-            Predicted probabilities for each class [P(class=0), P(class=1)]
-        """
-        X_with_radius = self._add_radius_feature(X)
-        probs = self.gam_model_.predict_proba(X_with_radius)
-        return np.column_stack([1 - probs, probs])
-
 
 @click.command()
-@click.option('--num-augment', default=10, help='Number of augmentation samples', type=int)
+@click.option('--num-augment', default=15, help='Number of augmentation samples', type=int)
 def main(num_augment):
+    EXPERIMENT_ID = create_experiment_hash(locals())
     asset_dir = 'results/concept_shift/gaussian_reference/posterior_fmpe/p_values_catgb'
-    experiment_dir = f'results/concept_shift/gaussian_reference/posterior_fmpe/p_values_catgb'
+    experiment_dir = f'results/concept_shift/gaussian_reference/posterior_fmpe/p_values_catgb/{EXPERIMENT_ID}'
+    # asset_dir = experiment_dir
     os.makedirs(Path(experiment_dir), exist_ok=True)
 
     ### Settings
@@ -139,7 +52,7 @@ def main(num_augment):
     )
 
     B = 50_000  # num simulations to estimate posterior and test statistics
-    B_PRIME = 50_000  # num simulations to estimate critical values
+    B_PRIME = 30_000  # num simulations to estimate critical values
     B_DOUBLE_PRIME = 10_000  # num simulations to do diagnostics
     EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
@@ -229,6 +142,30 @@ def main(num_augment):
         with open(f'{experiment_dir}/confidence_sets_strong_prior.pkl', 'wb') as f:
             dill.dump(confidence_sets, f)
 
+    # try:
+    #     with open(f'{asset_dir}/credible_sets_strong_prior.pkl', 'rb') as f:
+    #         credible_sets = dill.load(f)
+    # except:
+    #     remaining = len(obs_x)
+    #     credible_sets = []
+    #     for x in obs_x:  # torch.vstack([task.get_observation(i) for i in range(1, 11)])
+    #         print(f'Remaining: {remaining}', flush=True)
+    #         credible_sets_x = []
+    #         for cl in CONFIDENCE_LEVEL:
+    #             actual_cred_level, credible_set = hpd_region(
+    #                 posterior=fmpe_posterior,
+    #                 param_grid=EVAL_GRID_DISTR.sample(sample_shape=(EVAL_GRID_SIZE, )),
+    #                 x=x.reshape(-1, ),
+    #                 credible_level=cl,
+    #                 num_level_sets=10_000,
+    #                 **POSTERIOR_KWARGS
+    #             )
+    #             #print(actual_cred_level, flush=True)
+    #             credible_sets_x.append(credible_set)
+    #         credible_sets.append(credible_sets_x)
+    #         remaining -= 1
+    #     with open(f'{asset_dir}/credible_sets_strong_prior.pkl', 'wb') as f:
+    #         dill.dump(credible_sets, f)
 
     plt.rc('text', usetex=True)  # Enable LaTeX
     plt.rc('font', family='serif')  # Use a serif font (e.g., Computer Modern)
@@ -246,6 +183,40 @@ def main(num_augment):
             title = r'\textbf{a)} Prior poorly aligned with $\theta^{\star}$'
         else:
             title = r'\textbf{b)} Prior well aligned with $\theta^{\star}$'
+
+        # plot_parameter_regions(
+        #     *credible_sets[idx_obs], #*[confidence_sets[j][idx_obs] for j in range(len(CONFIDENCE_LEVEL))],
+        #     param_dim=2,
+        #     true_parameter=true_theta[idx_obs, :],
+        #     prior_samples=PRIOR.sample(sample_shape=(50_000, )).numpy(),
+        #     parameter_space_bounds={
+        #         r'$\theta_1$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_1$'])), 
+        #         r'$\theta_2$': dict(zip(['low', 'high'], POI_BOUNDS[r'$\theta_2$'])), 
+        #     },
+        #     # parameter_space_bounds={
+        #     #     r'$\theta_1$': dict(zip(['low', 'high'], [-1.0, 1.0])), 
+        #     #     r'$\theta_2$': dict(zip(['low', 'high'], [-1.0, 1.0])), 
+        #     # },
+        #     colors=[
+        #         'purple', 'deeppink', # 'hotpink',  # credible sets
+        #         #'teal', 'mediumseagreen', 'darkseagreen', # confidence sets
+        #     ],
+        #     region_names=[
+        #         *[f'HPD {int(cl*100):.0f}\%' for cl in CONFIDENCE_LEVEL],
+        #         #*[f'CS {cl*100:.1f}%' for cl in CONFIDENCE_LEVEL],
+        #     ],
+        #     labels=[r'$\theta_1$', r'$\theta_2$'],
+        #     linestyles=['-', '--'],  # , ':'
+        #     param_names=[r'$\theta_1$', r'$\theta_2$'],
+        #     alpha_shape=False,
+        #     alpha=3,
+        #     scatter=True,
+        #     figsize=(5, 5),
+        #     save_fig_path=f'{experiment_dir}/hpd{idx_obs}.png',
+        #     remove_legend=True,
+        #     title='HPD Regions',
+        #     custom_ax=None
+        # )
 
         plot_parameter_regions(
             *[confidence_sets[j][idx_obs] for j in range(len(CONFIDENCE_LEVEL))],
@@ -280,6 +251,8 @@ def main(num_augment):
     try:
         with open(f'{experiment_dir}/diagn_confset_strong_prior.pkl', 'rb') as f:
             diagn_objects = dill.load(f)
+        with open(f'{experiment_dir}/diagn_cred_strong_prior.pkl', 'rb') as f:
+            diagn_objects_cred = dill.load(f)
         with open(f'{experiment_dir}/b_double_prime.pkl', 'rb') as f:
             b_double_prime = dill.load(f)
             b_double_prime_params, b_double_prime_samples = b_double_prime['params'], b_double_prime['samples']
@@ -313,6 +286,31 @@ def main(num_augment):
         plt.clim(vmin=0, vmax=1)
         plt.colorbar()
         plt.savefig(f'{experiment_dir}/freb_coverage')
+        plt.close()
+
+        diagn_objects_cred = {}
+        size_grid_for_sizes = 5_000
+        for cl in CONFIDENCE_LEVEL[:1]:  # 0.954
+            print(cl, flush=True)
+            diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes = lf2i.diagnostics(
+                region_type='posterior',
+                confidence_level=cl,
+                coverage_estimator='cat-gb',
+                T_double_prime=(b_double_prime_params, b_double_prime_samples),
+                posterior_estimator=lf2i.test_statistic.estimator,
+                evaluation_grid=EVAL_GRID_DISTR.sample(sample_shape=(size_grid_for_sizes, )),
+                num_level_sets=5_000,
+                **POSTERIOR_KWARGS
+            )
+            diagn_objects_cred[cl] = (diagnostics_estimator_credible, out_parameters_credible, mean_proba_credible, upper_proba_credible, lower_proba_credible, sizes)
+        with open(f'{experiment_dir}/diagn_cred_strong_prior.pkl', 'wb') as f:
+            dill.dump(diagn_objects_cred, f)
+
+        plt.scatter(out_parameters_credible[:, 0], out_parameters_credible[:, 1], c=mean_proba_credible)
+        plt.title('Coverage of credible regions')
+        plt.clim(vmin=0, vmax=1)
+        plt.colorbar()
+        plt.savefig(f'{experiment_dir}/hpd_coverage')
         plt.close()
 
 

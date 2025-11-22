@@ -84,11 +84,13 @@ def main(hidden_layers,
     EVAL_GRID_SIZE = 25_000  # num evaluation points over parameter space to construct confidence sets
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
-    REFERENCE = BoxUniform(
+    REFERENCE = MultivariateNormal(
+        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=36*torch.eye(n=POI_DIM)
+    )
+    REFERENCE_DIAGNOSTICS = BoxUniform(
         low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
         high=torch.tensor((POI_BOUNDS[r'$\theta_1$'][1]+1, POI_BOUNDS[r'$\theta_2$'][1]+1))
     )
-    REFERENCE_DIAGNOSTICS = REFERENCE
     # REFERENCE = PRIOR
     EVAL_GRID_DISTR = BoxUniform(
         low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0], POI_BOUNDS[r'$\theta_2$'][0])),

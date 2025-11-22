@@ -85,7 +85,7 @@ def main(hidden_layers,
     CONFIDENCE_LEVEL = 0.954, 0.683  # 0.99
 
     REFERENCE = MultivariateNormal(
-        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=64*torch.eye(n=POI_DIM)
+        loc=torch.Tensor(PRIOR_LOC), covariance_matrix=36*torch.eye(n=POI_DIM)
     )
     REFERENCE_DIAGNOSTICS = BoxUniform(
         low=torch.tensor((POI_BOUNDS[r'$\theta_1$'][0]-1, POI_BOUNDS[r'$\theta_2$'][0]-1)),
