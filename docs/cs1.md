@@ -1,5 +1,6 @@
 ---
 layout: default
+title: Supplement on Case Study I
 ---
 
 # Supplement on Case Study I
@@ -16,7 +17,7 @@ We base the parameter distributions of the simulated air showers on the followin
 
 Note that Mrk421 is a point source much like the Crab Nebula, but the DM Annihilation source is a theorized mechanism that could happen anywhere in the cosmos. As such, we treat DM as a diffuse source of gamma ray events that hit the Earth from all directions. We only consider the zenith component of the point source trajectories, azimuth distributed uniformly, for direct comparison between sources.
 
-The zenith distribution along the Crab and Mrk 421 trajectories relative to the zenith distribution in the pre-simulated CORSIKA data is used to assign weights to individual gamma ray events. All trajectory calculations are performed using `astropy`. Each source's theoretical energy spectrum assign weights to individual gamma ray events in the pre-simulated set. For the Crab Nebula, we use the log-parabola fit proposed by Aleksić et al. (2015). For Mrk 421, we perform a custom fit to observational data that accounts for attenuation of gamma-ray flux due to extragalactic background light (EBL). For the DM source, we use `gammapy` to generate the dark-matter annihilation spectrum for very heavy DM particles (100 TeV). We do not attenuate this spectrum using EBL.
+The zenith distribution along the Crab and Mrk 421 trajectories relative to the zenith distribution in the pre-simulated CORSIKA data is used to assign weights to individual gamma ray events. All trajectory calculations are performed using `astropy` [[1](#ref1)]. Each source's theoretical energy spectrum assign weights to individual gamma ray events in the pre-simulated set. For the Crab Nebula, we use the log-parabola fit proposed by [[2](#ref2)]. For Mrk 421, we perform a custom fit to observational data that accounts for attenuation of gamma-ray flux due to extragalactic background light (EBL). For the DM source, we use `gammapy` [[3](#ref3)] to generate the dark-matter annihilation spectrum for very heavy DM particles (100 TeV). We do not attenuate this spectrum using EBL.
 
 High-energy gamma rays must be discriminated from the much more abundant charged cosmic rays (protons and heavier hadrons) hitting the Earth atmosphere. Because hadrons also produce an atmospheric shower observable by ground detectors, a preliminary step in reconstructing gamma-ray events from ground detector data is to first determine if an observed shower is a gamma ray or a hadron. We do not perform this initial classification step in this case study and focus only on the reconstruction of gamma-ray events. This assumption does not affect the results obtained in this work since we are concentrating on individual events rather than attempting a full reconstruction.
 
@@ -43,7 +44,7 @@ We place our observer at 19 degrees north for definitiveness. This latitude corr
 
 ## Details on Training
 
-We train our posterior estimator using a the flow matching architecture, a diffusion-based model with training-based acceleration, to obtain an estimate of the posterior $$\hat p(\theta_i \mid X_i)$$. We use the `SBI` Python package v0.23.2 to implement the flow matching model. We use the default model architecture in `SBI`, but use a custom context model to convert our high-dimensional $$X_i$$ into a low-dimensional context vector:
+We train our posterior estimator using a the flow matching architecture, a diffusion-based model with training-based acceleration, to obtain an estimate of the posterior $$\hat p(\theta_i \mid X_i)$$. We use the `SBI` Python package v0.23.2 [[4](#ref4)] to implement the flow matching model. We use the default model architecture in `SBI`, but use a custom context model to convert our high-dimensional $$X_i$$ into a low-dimensional context vector:
 
 1. $$X_i$$ has initial shape 3×2000×2000
 2. Max pooling for timing channel and Average pooling for counts channels with kernel size/stride of 20
@@ -52,3 +53,19 @@ We train our posterior estimator using a the flow matching architecture, a diffu
 5. Flattening and fully connected layer to a fixed sized context vector
 
 Additional hyperparameters can be found on the `SBI` GitHub repository.
+
+---
+
+## References
+
+<a id="ref1"></a>
+**[1]** Astropy Collaboration, Price-Whelan, A. M., Lim, P. L., Earl, N., Starkman, N., Bradley, L., Shupe, D. L., et al. (2022). The Astropy Project: Sustaining and Growing a Community-oriented Open-source Project and the Latest Major Release (v5.0) of the Core Package. *The Astrophysical Journal*, *935*(2), 167. [https://doi.org/10.3847/1538-4357/ac7c74](https://doi.org/10.3847/1538-4357/ac7c74)
+
+<a id="ref2"></a>
+**[2]** Aleksić, J., Ansoldi, S., Antonelli, L. A., Antoranz, P., Babic, A., Bangale, P., et al. (2015). Measurement of the Crab Nebula spectrum over three decades in energy with the MAGIC telescopes. *Journal of High Energy Astrophysics*, *5-6*, 30–38. [https://doi.org/10.1016/j.jheap.2015.01.002](https://doi.org/10.1016/j.jheap.2015.01.002)
+
+<a id="ref3"></a>
+**[3]** Donath, A., Terrier, R., Remy, Q., Sinha, A., Nigro, C., Pintore, F., et al. (2023). Gammapy: A Python package for gamma-ray astronomy. *Astronomy and Astrophysics*, *678*, A157. [https://doi.org/10.1051/0004-6361/202346488](https://doi.org/10.1051/0004-6361/202346488)
+
+<a id="ref4"></a>
+**[4]** Tejero-Cantero, A., Boelts, J., Deistler, M., Lueckmann, J.-M., Durkan, C., Gonçalves, P. J., Greenberg, D. S., & Macke, J. H. (2020). sbi: A toolkit for simulation-based inference. *Journal of Open Source Software*, *5*(52), 2505. [https://doi.org/10.21105/joss.02505](https://doi.org/10.21105/joss.02505)
