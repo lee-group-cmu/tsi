@@ -3,9 +3,9 @@ layout: default
 title: Supplement on Case Study I
 ---
 
-# Supplement on Case Study I
+# Supplement on case study I
 
-## Experimental Setup
+## Experimental setup
 
 Training and target data sets for this case study have been created as a proof-of-concept. We are not simulating a full-fledged ground-based gamma-ray experiment as it would not change our main results and the applicability of FreB.
 
@@ -42,7 +42,7 @@ We remove all gamma-ray events in all data splits where less than 10 ground dete
 
 We place our observer at 19 degrees north for definitiveness. This latitude corresponds to the current location of the operational HAWC observatory.
 
-## Details on Training
+## Details on training
 
 We train our posterior estimator using a the flow matching architecture, a diffusion-based model with training-based acceleration, to obtain an estimate of the posterior $$\hat p(\theta_i \mid X_i)$$. We use the `SBI` Python package v0.23.2 [[4](#ref4)] to implement the flow matching model. We use the default model architecture in `SBI`, but use a custom context model to convert our high-dimensional $$X_i$$ into a low-dimensional context vector:
 

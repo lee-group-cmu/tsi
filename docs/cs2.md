@@ -3,9 +3,9 @@ layout: default
 title: Supplement on Case Study II
 ---
 
-# Supplement on Case Study II
+# Supplement on case study II
 
-## Experimental Set-up
+## Experimental set-up
 
 In this case study, we identify stars along the $$(\ell, b)=(70^\circ, 30^\circ)$$ (in Galactic coordinates) line of sight because it amply includes both disk and halo components. To obtain **Model H**, we decrease the default mean and increase the default variance of the age distribution in the galactic halo component from `brutus`. To obtain **Model D**, we increase the mean of the conditional metallicity-given-age distribution according to Table 1. These hyperparameters affect the `brutus` model which is encoded as a collection of PDFs which can be evaluated directly. See Sec 2.4 in [[1](#ref1)] for further details on the `brutus` prior.
 
@@ -52,7 +52,7 @@ $$$$X = (\tilde{M}_1, \tilde{M}_2, \ldots, \tilde{M}_8, M)\in\mathbb{R}^9,$$$$
 
 where $$M$$ is such that $$\tilde{M}_i = M_i / M$$, to help with the stability of network training.
 
-## Details on Training
+## Details on training
 
 We trained a posterior estimator $$\hat{\pi}(\theta\mid X)$$ using a normalizing flow model with the masked autoregressive flow [[4](#ref4)] architecture as implemented in the `SBI` library [[5](#ref5)] with 50 hidden features over five hidden layers. Quantile regression for calibration of the FreB method was implemented using Python's `CatBoost` library [[6](#ref6)]. We used $$B=500{,}000$$ for training, $$B'=500{,}000$$ for calibration, and $$B''=25{,}000$$ for evaluation.
 

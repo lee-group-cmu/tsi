@@ -9,9 +9,9 @@
         :root {
             --max-width: 800px;
             --spacing: 2rem;
-            --font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            --font-body: 'Times New Roman', Times, serif;
             --font-mono: 'Courier New', Courier, monospace;
-            --color-bg: #ffffff;
+            --color-bg: #faf8f3;
             --color-bg-outer: #2c3e50;
             --color-text: #333333;
             --color-link: #0066cc;
@@ -58,6 +58,15 @@
             background-color: var(--color-link-hover);
             text-decoration: none;
             color: white;
+        }
+        
+        .title-box {
+            border: 2px solid var(--color-border);
+            padding: 2em;
+            margin: 2em 0;
+            text-align: center;
+            background-color: #fafafa;
+            border-radius: 8px;
         }
         
         h1, h2, h3, h4, h5, h6 {
@@ -173,6 +182,9 @@
     </style>
 </head>
 <body>
+    {% unless page.url == "/" or page.url == "/index.html" %}
+    <a href="/" class="home-button">← Home</a>
+    {% endunless %}
     {{ content }}
 </body>
 </html>

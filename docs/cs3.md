@@ -3,9 +3,9 @@ layout: default
 title: Supplement on Case Study III
 ---
 
-# Supplement on Case Study III
+# Supplement on case study III
 
-## Experimental Setup
+## Experimental setup
 
 Large astronomical flagship surveys like *Gaia* [[1](#ref1)] photometrically observe sources (e.g., stars and galaxies) and rely on other—often smaller—higher-resolution spectroscopic surveys to accurately determine the properties (i.e., "labels") of these sources. The resulting survey catalogs are then "cross-matched" to correctly match the same sources observed with different instruments, at different times, and in different wavelengths [[2](#ref2)]. However, due to observational limitations and label systematics, neither the large flagship surveys nor higher-resolution surveys uniformly observe (i.e, randomly sample) sources across the sky, resulting in labeled data that are often biased and do not match the target data of interest for inference [[3](#ref3)].
 
@@ -34,7 +34,7 @@ To generate our two data settings, we censor in a way that reflects possible obs
 | No selection bias | 101,481 | 40,592 | 60,889 |
 | Selection bias & follow-up survey | 61,859 | 40,592 | 60,889 |
 
-## Details on Training
+## Details on training
 
 We estimate the posterior distribution $$\pi(\theta\mid X)$$ with masked autoregressive flows [[7](#ref7)] as implemented in the `SBI` package [[8](#ref8)] and construct 90% HPD and FreB sets in both data settings with and without selection bias. For FreB, we performed quantile regression with Python's `CatBoost` package [[9](#ref9)]. For various metallicity ranges, we provide side-by-side box plots for local coverage for both HPD and FreB sets under the two data settings in Figures 7 and 8 (main text).
 

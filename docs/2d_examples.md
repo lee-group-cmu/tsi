@@ -3,9 +3,9 @@ layout: default
 title: Supplement on 2D Synthetic Examples
 ---
 
-# Supplement on 2D Synthetic Examples
+# Supplement on 2D synthetic examples
 
-## 2D Synthetic Example in Figure 4
+## 2D synthetic example in Figure 4
 
 The synthetic example in Figure 4 showcases the main properties of our framework—i.e., reliability (in the form of correct coverage) and precision (in the form of optimal constraining power)—for an inference task that was introduced in [[1](#ref1)] and has become a standard benchmark in the SBI literature. It consists of estimating the (common) mean of the components of a two-dimensional Gaussian mixture, with one component having much broader covariance:
 
@@ -41,7 +41,7 @@ $$
 
 4. We check local coverage as detailed in Appendix A.8 by first generating a diagnostic set $$\mathcal{T}_{\text{diagn}} = \{(\theta_i, X_i)\}_{i=1}^{B^{\prime\prime}} \sim p(X \mid \theta)q(\theta)$$ with $$B^{\prime\prime}=20{,}000$$ and $$q(\theta) = \mathcal{U}([-10, 10] \times [-10, 10])$$ and then learning a probabilistic classifier via a tree-based gradient-boosted probabilistic classifier as implemented in the CatBoost library [[5](#ref5)].
 
-## 2D Synthetic Example in Figure 8
+## 2D synthetic example in Figure 8
 
 For this example, we construct a training set $$\mathcal{T}_{\text{train}} = \{(\theta_i, X_i)\}_{i=1}^B \sim p(X \mid \theta)\pi(\theta)$$ with $$B=50{,}000$$ and $$\pi(\theta) = \mathcal{N}(0, 2I)$$ (the true data generating process). Specification of data generation and models are otherwise identical
 

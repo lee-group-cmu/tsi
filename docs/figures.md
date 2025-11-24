@@ -3,7 +3,7 @@ layout: default
 title: Supplementary Figures
 ---
 
-# Supplementary Figures
+# Supplementary figures
 
 ## Figure S1: Example features collected for a single gamma-ray event
 
