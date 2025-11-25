@@ -5,7 +5,7 @@ title: Supplement on Waldo vs FreB
 
 # Supplement on Waldo vs FreB
 
-We provide an empirical demonstration of the implication of Theorem 6—that the confidence sets produced by the FreB framework are, **on average over the target population**, the smallest among all locally valid confidence procedures. To emphasize this point, we compare FreB with another likelihood-free confidence procedure, **Waldo** [[1](#ref1)], on the classic *Two Moons* task.
+We provide an empirical demonstration of the implication of Theorem 6—that the confidence sets produced by the FreB framework are, **on average over the target population**, the smallest among all locally valid confidence procedures. To emphasize this point, we compare FreB with another likelihood-free confidence procedure, **Waldo** [[1](#ref1)], on the *Two Moons* example [[2](#ref2)].
 
 For this task, data are generated from a bimodal likelihood of the form
 
@@ -22,12 +22,12 @@ r~\sin(\alpha)
 \end{pmatrix},
 $$
 
-with $$\alpha\sim\mathcal{U}(-\pi/2,\pi/2)$$ and $$r\sim\mathcal{N}(0.1,0.01^2)$$.
+with $$\alpha\sim\mathcal{U}(-\pi/2,\pi/2)$$ and $$r\sim\mathcal{N}(0.1,0.01^2)$$. The parameter of interest is $$\theta$$.
 
 We study the comparative performance of **Waldo** and **FreB** under two priors:
 
 1. a uniform prior on $$\Theta=[-1,1]^2$$, and
-2. a strong Gaussian prior.
+2. a localized Gaussian prior.
 
 In each case, we use a flow-matching posterior estimator from the **SBI** library [[2](#ref2)], using default hyperparameters. We generate one observation from each mode of the likelihood:
 
@@ -57,19 +57,19 @@ Figure 1 shows results under the uniform prior. The primary factor influencing t
 
 ![FreB vs Waldo with uniform prior](figures/freb_v_waldo_uniform_prior.png)
 
-**Figure 1—FreB confidence sets are precise (uniform prior).**
-With the two-moons task, FreB (Panel b) yields substantially more precise confidence sets than **Waldo** (Panel a), which tends to merge the two modes and become conservative as a result.
+**Figure 1—FreB confidence sets are precise: uniform prior.**
+With the two moons example, we show that confidence sets obtained with our framework are more precise than those using **Waldo** [[1](#ref1)], a likelihood-free inference method which similarly guarantees sets which achieve approximate nominal coverage. In the case with a uniform prior, the **Waldo** method provides sets which merge the two modes of the likelihood, and are conservative as a result.
 
 ---
 
-## Case 2: Strong Prior
+## Case 2: Localized Prior
 
-Figure 2 displays results under the strong prior. Both FreB and Waldo maintain local coverage despite being trained under a strongly informative prior. In this case, Waldo's confidence sets can also be multimodal (see Panel a), but they are less constrained beyond the prior support than FreB's. This behavior may arise because Waldo's test statistic depends more heavily on the posterior estimator's variance than the posterior density itself.
+Figure 2 displays results under the localized prior. Both FreB and Waldo maintain local coverage despite being trained under a strongly informative prior. In this case, Waldo's confidence sets can also be multimodal (see Panel a), but they are less constrained beyond the prior support than FreB's. This behavior may arise because Waldo's test statistic depends more heavily on the posterior estimator's variance than the posterior density itself.
 
-![FreB vs Waldo with strong prior](figures/freb_v_waldo_strong_prior.png)
+![FreB vs Waldo with localized prior](figures/freb_v_waldo_strong_prior.png)
 
-**Figure 2—FreB confidence sets are precise (strong prior).**
-Under the strong prior, FreB (Panel b) again provides tighter confidence sets than Waldo (Panel a).
+**Figure 2—FreB confidence sets are precise (localized prior).**
+As was the case in Figure 1, under the localized prior, FreB (Panel b) again provides tighter confidence sets than **Waldo** (Panel a).
  
 ---
 
